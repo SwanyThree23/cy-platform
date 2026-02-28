@@ -1,0 +1,139 @@
+version: '3.8'
+
+services:
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: cy-postgres
+    environment:
+      POSTGRES_DB: cyplatform
+      POSTGRES_USER: cyuser
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - cy-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cyuser -d cyplatform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # Redis (for session management & caching)
+  # ============================================
+  redis:
+    image: redis:7-alpine
+    container_name: cy-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - cy-network
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  # ============================================
+  # Backend API Server
+  # ============================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cy-backend
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3001
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://cyuser:${DB_PASSWORD:-changeme}@postgres:5432/cyplatform
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      STREAM_ENCRYPTION_KEY: ${STREAM_ENCRYPTION_KEY}
+      JWT_SECRET: ${JWT_SECRET}
+      MEDIASOUP_LISTEN_IP: 0.0.0.0
+      MEDIASOUP_ANNOUNCED_IP: ${MEDIASOUP_ANNOUNCED_IP:-backend}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      LLM_MODEL: ${LLM_MODEL:-anthropic/claude-3.5-sonnet}
+      REDIS_URL: redis://redis:6379
+    ports:
+      - "3001:3001"
+      - "10000-10100:10000-10100/udp"
+      - "10000-10100:10000-10100/tcp"
+    networks:
+      - cy-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run build && npm start"
+
+  # ============================================
+  # RTMP Server (Node Media Server)
+  # ============================================
+  rtmp:
+    image: alfg/nginx-rtmp
+    container_name: cy-rtmp
+    ports:
+      - "1935:1935"
+      - "8080:8080"
+    networks:
+      - cy-network
+    volumes:
+      - ./rtmp/nginx.conf:/etc/nginx/nginx.conf
+
+  # ============================================
+  # Frontend React App
+  # ============================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cy-frontend
+    environment:
+      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:3001}
+    ports:
+      - "3000:3000"
+    networks:
+      - cy-network
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm start"
+
+  # ============================================
+  # Nginx Reverse Proxy
+  # ============================================
+  nginx:
+    image: nginx:alpine
+    container_name: cy-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/ssl:/etc/nginx/ssl
+    networks:
+      - cy-network
+    depends_on:
+      - backend
+      - frontend
+      - rtmp
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  cy-network:
+    driver: bridge
