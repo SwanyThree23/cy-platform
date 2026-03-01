@@ -10,6 +10,7 @@ RUN npm install --legacy-peer-deps
 COPY . .
 
 # Build production app
+ENV CI=false
 ENV GENERATE_SOURCEMAP=false
 ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN npm run build
