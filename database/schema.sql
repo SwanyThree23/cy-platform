@@ -482,3 +482,4 @@ COMMENT ON TABLE streams IS 'Live streams with cross-platform RTMP fan-out confi
 COMMENT ON TABLE payments IS 'Zero-fee payment records with direct creator payments';
 COMMENT ON TABLE stream_guests IS 'Guest panelists in Gold Board Grid layout';
 COMMENT ON TABLE rtmp_relays IS 'Cross-platform streaming relay configurations';
+$watch_party_sql
