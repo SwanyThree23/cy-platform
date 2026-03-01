@@ -1,9 +1,6 @@
-FROM node:18-bullseye-slim
+FROM node:18
 
 WORKDIR /app
-
-# Install build tools required by mediasoup
-RUN apt-get update && apt-get install -y python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
 COPY package*.json ./
