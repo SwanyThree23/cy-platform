@@ -148,11 +148,11 @@ app.use("/api/", limiter);
 // ============================================
 
 class MediasoupManager extends EventEmitter {
-  private workers: mediasoup.types.Worker[] = [];
-  private routers: Map<string, mediasoup.types.Router> = new Map();
-  private transports: Map<string, mediasoup.types.WebRtcTransport> = new Map();
-  private producers: Map<string, mediasoup.types.Producer> = new Map();
-  private consumers: Map<string, mediasoup.types.Consumer> = new Map();
+  public workers: mediasoup.types.Worker[] = [];
+  public routers: Map<string, mediasoup.types.Router> = new Map();
+  public transports: Map<string, mediasoup.types.WebRtcTransport> = new Map();
+  public producers: Map<string, mediasoup.types.Producer> = new Map();
+  public consumers: Map<string, mediasoup.types.Consumer> = new Map();
   private nextWorkerIndex = 0;
 
   async initialize(numWorkers = 2) {
@@ -387,7 +387,7 @@ class RTMPFanOutManager extends EventEmitter {
     const processId = `${streamId}:${platform}`;
 
     // Get user's encrypted stream key for this platform
-    const { data: streamData, error } = await supabase
+    const { data: streamData, error }: any = await supabase
       .from("streams")
       .select(`host:users!inner(${platform}_stream_key)`)
       .eq("id", streamId)
@@ -616,7 +616,7 @@ Be strict but fair. Allow casual conversation and mild profanity. Delete only se
       });
 
       if (!response.ok) throw new Error(`API error: ${response.status}`);
-      const data = await response.json();
+      const data: any = await response.json();
       const content = data.choices[0]?.message?.content || "";
       const result = JSON.parse(content);
       return {
@@ -667,7 +667,7 @@ Be strict but fair. Allow casual conversation and mild profanity. Delete only se
       });
 
       if (!response.ok) throw new Error(`API error: ${response.status}`);
-      const data = await response.json();
+      const data: any = await response.json();
       return data.choices[0]?.message?.content || "";
     } catch (error: any) {
       console.error("[SwaniAI] AI Ask error:", error);
@@ -701,7 +701,7 @@ Be strict but fair. Allow casual conversation and mild profanity. Delete only se
         }),
       });
       if (!response.ok) return message.substring(0, maxLength) + "...";
-      const data = await response.json();
+      const data: any = await response.json();
       return (
         data.choices[0]?.message?.content ||
         message.substring(0, maxLength) + "..."
