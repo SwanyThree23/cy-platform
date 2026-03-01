@@ -1,0 +1,17 @@
+{
+  "name": "cy-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "CY Platform - Zero-Fee Live Streaming Beta Launch Suite",
+  "scripts": {
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build:all": "cd backend && npm run build && cd ../frontend && npm run build",
+    "dev": "concurrently \"cd backend && npm run dev\" \"cd frontend && npm run start\"",
+    "docker:up": "docker-compose up -d --build",
+    "docker:down": "docker-compose down",
+    "deploy:hostinger": "bash scripts/deploy-hostinger.sh"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

@@ -482,4 +482,45 @@ COMMENT ON TABLE streams IS 'Live streams with cross-platform RTMP fan-out confi
 COMMENT ON TABLE payments IS 'Zero-fee payment records with direct creator payments';
 COMMENT ON TABLE stream_guests IS 'Guest panelists in Gold Board Grid layout';
 COMMENT ON TABLE rtmp_relays IS 'Cross-platform streaming relay configurations';
-$watch_party_sql
+-- ============================================
+-- TABLE: watch_parties
+-- ============================================
+
+CREATE TABLE watch_parties (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    host_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    video_url TEXT NOT NULL,
+    video_source VARCHAR(50) DEFAULT 'youtube',
+    video_id VARCHAR(100),
+    invite_code VARCHAR(20) UNIQUE NOT NULL,
+    visibility visibility_type DEFAULT 'public',
+    status VARCHAR(50) DEFAULT 'active',
+    current_time_seconds INTEGER DEFAULT 0,
+    is_playing BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_watch_parties_host ON watch_parties(host_id);
+CREATE INDEX idx_watch_parties_invite ON watch_parties(invite_code);
+CREATE INDEX idx_watch_parties_status ON watch_parties(status);
+
+-- ============================================
+-- TABLE: watch_party_participants
+-- ============================================
+
+CREATE TABLE watch_party_participants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    watch_party_id UUID NOT NULL REFERENCES watch_parties(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status VARCHAR(50) DEFAULT 'connected', -- connected, disconnected
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    last_seen_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    
+    UNIQUE(watch_party_id, user_id)
+);
+
+CREATE INDEX idx_wp_participants_party ON watch_party_participants(watch_party_id);
+CREATE INDEX idx_wp_participants_user ON watch_party_participants(user_id);
