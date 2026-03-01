@@ -71,10 +71,6 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    volumes:
-      - ./backend:/app
-      - /app/node_modules
-    command: sh -c "npm install --no-audit --no-fund --legacy-peer-deps && npm run build && npm start"
 
   # ============================================
   # RTMP Server (Node Media Server)
@@ -106,10 +102,6 @@ services:
       - cy-network
     depends_on:
       - backend
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-    command: sh -c "npm install --no-audit --no-fund --legacy-peer-deps && npm start"
 
   # ============================================
   # Nginx Reverse Proxy
