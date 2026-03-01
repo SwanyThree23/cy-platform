@@ -198,8 +198,7 @@ const PaymentButtons: React.FC<{
             return (
               <button
                 key={method.key}
-                className="payment-btn zelle"
-                style={{ backgroundColor: method.color }}
+                className={`payment-btn ${method.key}`}
                 onClick={() => {
                   alert(`Zelle payments go to: ${handle}`);
                   onPaymentClick?.(method.key, '');
@@ -218,8 +217,7 @@ const PaymentButtons: React.FC<{
               href={url}
               target="_blank"
               rel="noopener noreferrer"
-              className="payment-btn"
-              style={{ backgroundColor: method.color }}
+              className={`payment-btn ${method.key}`}
               onClick={() => onPaymentClick?.(method.key, url)}
             >
               <span className="payment-icon">{method.icon}</span>
@@ -723,7 +721,7 @@ const WatchPartyRoom: React.FC<{
         </div>
 
         <div className="ready-panel">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div className="ready-panel-header">
             <h3>Participants Ready Status</h3>
             <button 
               className={`ready-btn ${isReady ? 'active' : ''}`}
@@ -745,10 +743,10 @@ const WatchPartyRoom: React.FC<{
 
         <div className="invite-section">
           <div>
-            <span style={{ color: 'var(--light-gray)', fontSize: '0.8rem' }}>Share Invite Code</span>
+            <span className="invite-label">Share Invite Code</span>
             <div className="invite-code">{partyId.toUpperCase()}</div>
           </div>
-          <button className="payment-btn" style={{ background: 'var(--gold-dark)' }} onClick={() => onLeave()}>
+          <button className="payment-btn leave-party-btn" onClick={() => onLeave()}>
             Leave Party
           </button>
         </div>
@@ -862,12 +860,12 @@ const App: React.FC = () => {
                 </div>
               </section>
 
-              <section style={{ marginTop: '2rem' }}>
+              <section className="watch-parties-section">
                 <h2>Watch Parties</h2>
                 <div className="stream-list">
-                  <div className="stream-card" style={{ borderLeft: '4px solid var(--accent)' }} onClick={() => handleJoinParty('party-demo')}>
-                    <div className="stream-thumbnail" style={{ background: 'var(--dark-gray)' }}>
-                      <span className="live-badge" style={{ background: 'var(--accent)' }}>WATCH PARTY</span>
+                  <div className="stream-card party-card" onClick={() => handleJoinParty('party-demo')}>
+                    <div className="stream-thumbnail party-thumbnail">
+                      <span className="live-badge party-badge">WATCH PARTY</span>
                     </div>
                     <div className="stream-details">
                       <h3>Movie Night with Fans</h3>
@@ -887,17 +885,16 @@ const App: React.FC = () => {
                 Go Live
               </button>
               <button 
-                className="host-btn"
-                style={{ marginTop: '1rem', background: 'var(--medium-gray)', color: 'var(--gold-primary)', border: '1px solid var(--gold-dark)' }}
+                className="host-btn start-party-btn"
                 onClick={handleCreateParty}
               >
                 Start Watch Party
               </button>
               
-              <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--black)', borderRadius: '8px' }}>
-                <p style={{ fontSize: '0.8rem', color: 'var(--light-gray)' }}>Join by Invite Code</p>
-                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <input type="text" placeholder="CODE" className="chat-input" style={{ width: '80%' }} />
+              <div className="join-party-container">
+                <p className="join-party-label">Join by Invite Code</p>
+                <div className="join-party-input-group">
+                  <input type="text" placeholder="CODE" className="chat-input join-party-input" />
                   <button className="chat-send-btn">➔</button>
                 </div>
               </div>
