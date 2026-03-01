@@ -191,7 +191,7 @@ class MediasoupManager extends EventEmitter {
 
     const worker = this.getNextWorker();
     const router = await worker.createRouter({
-      mediaCodecs: MEDIASOUP_CONFIG.router.mediaCodecs,
+      mediaCodecs: MEDIASOUP_CONFIG.router.mediaCodecs as mediasoup.types.RtpCodecCapability[],
     });
 
     this.routers.set(roomId, router);
@@ -266,8 +266,8 @@ class MediasoupManager extends EventEmitter {
     }
 
     if (
-      !transport.router.rtpCapabilities ||
-      !transport.router.canConsume({ producerId, rtpCapabilities })
+      !(transport as any).router?.rtpCapabilities ||
+      !(transport as any).router?.canConsume({ producerId, rtpCapabilities })
     ) {
       console.error(`[Mediasoup] Cannot consume ${producerId}`);
       return null;
