@@ -1,16 +1,16 @@
-import express from 'express';
-import { createServer } from 'http';
-import { Server } from 'socket.io';
-import cors from 'cors';
-import helmet from 'helmet';
-import compression from 'compression';
-import rateLimit from 'express-rate-limit';
-import { createClient } from '@supabase/supabase-js';
-import * as mediasoup from 'mediasoup';
-import ffmpeg from 'fluent-ffmpeg';
-import { EventEmitter } from 'events';
-import crypto from 'crypto';
-import dotenv from 'dotenv';
+import express from "express";
+import { createServer } from "http";
+import { Server } from "socket.io";
+import cors from "cors";
+import helmet from "helmet";
+import compression from "compression";
+import rateLimit from "express-rate-limit";
+import { createClient } from "@supabase/supabase-js";
+import * as mediasoup from "mediasoup";
+import ffmpeg from "fluent-ffmpeg";
+import { EventEmitter } from "events";
+import crypto from "crypto";
+import dotenv from "dotenv";
 
 dotenv.config();
 
@@ -19,48 +19,49 @@ dotenv.config();
 // ============================================
 
 const PORT = process.env.PORT || 3001;
-const HOST = process.env.HOST || '0.0.0.0';
-const NODE_ENV = process.env.NODE_ENV || 'development';
+const HOST = process.env.HOST || "0.0.0.0";
+const NODE_ENV = process.env.NODE_ENV || "development";
 
 // Supabase Configuration
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || '';
+const SUPABASE_URL = process.env.SUPABASE_URL || "";
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || "";
 
 // Encryption Key for Stream Credentials
-const ENCRYPTION_KEY = process.env.STREAM_ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
+const ENCRYPTION_KEY =
+  process.env.STREAM_ENCRYPTION_KEY || crypto.randomBytes(32).toString("hex");
 
 // Mediasoup Configuration
 const MEDIASOUP_CONFIG = {
   worker: {
     rtcMinPort: 10000,
     rtcMaxPort: 10100,
-    logLevel: 'warn',
-    logTags: ['info', 'ice', 'dtls', 'rtp', 'srtp', 'rtcp'],
+    logLevel: "warn",
+    logTags: ["info", "ice", "dtls", "rtp", "srtp", "rtcp"],
   },
   router: {
     mediaCodecs: [
       {
-        kind: 'audio',
-        mimeType: 'audio/opus',
+        kind: "audio",
+        mimeType: "audio/opus",
         clockRate: 48000,
         channels: 2,
       },
       {
-        kind: 'video',
-        mimeType: 'video/VP8',
+        kind: "video",
+        mimeType: "video/VP8",
         clockRate: 90000,
         parameters: {
-          'x-google-start-bitrate': 1000,
+          "x-google-start-bitrate": 1000,
         },
       },
       {
-        kind: 'video',
-        mimeType: 'video/H264',
+        kind: "video",
+        mimeType: "video/H264",
         clockRate: 90000,
         parameters: {
-          'packetization-mode': 1,
-          'profile-level-id': '4d0032',
-          'level-asymmetry-allowed': 1,
+          "packetization-mode": 1,
+          "profile-level-id": "4d0032",
+          "level-asymmetry-allowed": 1,
         },
       },
     ],
@@ -68,8 +69,8 @@ const MEDIASOUP_CONFIG = {
   webRtcTransport: {
     listenIps: [
       {
-        ip: process.env.MEDIASOUP_LISTEN_IP || '0.0.0.0',
-        announcedIp: process.env.MEDIASOUP_ANNOUNCED_IP || '127.0.0.1',
+        ip: process.env.MEDIASOUP_LISTEN_IP || "0.0.0.0",
+        announcedIp: process.env.MEDIASOUP_ANNOUNCED_IP || "127.0.0.1",
       },
     ],
     initialAvailableOutgoingBitrate: 1000000,
@@ -83,10 +84,16 @@ const MEDIASOUP_CONFIG = {
 
 // RTMP Fan-out Configuration
 const RTMP_CONFIG = {
-  instagram: { url: 'rtmps://live-upload.instagram.com:443/rtmp/', enabled: true },
-  tiktok: { url: 'rtmp://push-rtmp-f5-tt02.tiktokcdn.com/stage/', enabled: true },
-  facebook: { url: 'rtmps://live-api-s.facebook.com:443/rtmp/', enabled: true },
-  youtube: { url: 'rtmp://a.rtmp.youtube.com/live2/', enabled: true },
+  instagram: {
+    url: "rtmps://live-upload.instagram.com:443/rtmp/",
+    enabled: true,
+  },
+  tiktok: {
+    url: "rtmp://push-rtmp-f5-tt02.tiktokcdn.com/stage/",
+    enabled: true,
+  },
+  facebook: { url: "rtmps://live-api-s.facebook.com:443/rtmp/", enabled: true },
+  youtube: { url: "rtmp://a.rtmp.youtube.com/live2/", enabled: true },
 };
 
 // ============================================
@@ -97,11 +104,11 @@ const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-    methods: ['GET', 'POST'],
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    methods: ["GET", "POST"],
     credentials: true,
   },
-  transports: ['websocket', 'polling'],
+  transports: ["websocket", "polling"],
 });
 
 // Supabase Client
@@ -111,17 +118,21 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // MIDDLEWARE
 // ============================================
 
-app.use(helmet({
-  contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false,
-}));
+app.use(
+  helmet({
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  }),
+);
 app.use(compression());
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
-  credentials: true,
-}));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    credentials: true,
+  }),
+);
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 // Rate Limiting
 const limiter = rateLimit({
@@ -130,7 +141,7 @@ const limiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-app.use('/api/', limiter);
+app.use("/api/", limiter);
 
 // ============================================
 // MEDIASOUP SFU MANAGER
@@ -146,19 +157,19 @@ class MediasoupManager extends EventEmitter {
 
   async initialize(numWorkers = 2) {
     console.log(`[Mediasoup] Initializing ${numWorkers} workers...`);
-    
+
     for (let i = 0; i < numWorkers; i++) {
       const worker = await mediasoup.createWorker(MEDIASOUP_CONFIG.worker);
-      
-      worker.on('died', () => {
+
+      worker.on("died", () => {
         console.error(`[Mediasoup] Worker ${i} died, restarting...`);
         this.restartWorker(i);
       });
-      
+
       this.workers.push(worker);
     }
-    
-    console.log('[Mediasoup] All workers initialized successfully');
+
+    console.log("[Mediasoup] All workers initialized successfully");
   }
 
   private async restartWorker(index: number) {
@@ -185,31 +196,42 @@ class MediasoupManager extends EventEmitter {
 
     this.routers.set(roomId, router);
     console.log(`[Mediasoup] Router created for room: ${roomId}`);
-    
+
     return router;
   }
 
-  async createWebRtcTransport(roomId: string, peerId: string): Promise<mediasoup.types.WebRtcTransport> {
+  async createWebRtcTransport(
+    roomId: string,
+    peerId: string,
+  ): Promise<mediasoup.types.WebRtcTransport> {
     const router = await this.createRouter(roomId);
-    
-    const transport = await router.createWebRtcTransport(MEDIASOUP_CONFIG.webRtcTransport);
-    
+
+    const transport = await router.createWebRtcTransport(
+      MEDIASOUP_CONFIG.webRtcTransport,
+    );
+
     const transportId = `${roomId}:${peerId}`;
     this.transports.set(transportId, transport);
 
-    transport.on('dtlsstatechange', (dtlsState) => {
-      if (dtlsState === 'closed') {
+    transport.on("dtlsstatechange", (dtlsState) => {
+      if (dtlsState === "closed") {
         transport.close();
         this.transports.delete(transportId);
       }
     });
 
-    console.log(`[Mediasoup] WebRTC Transport created for peer: ${peerId} in room: ${roomId}`);
-    
+    console.log(
+      `[Mediasoup] WebRTC Transport created for peer: ${peerId} in room: ${roomId}`,
+    );
+
     return transport;
   }
 
-  async createProducer(transportId: string, kind: mediasoup.types.MediaKind, rtpParameters: any): Promise<mediasoup.types.Producer> {
+  async createProducer(
+    transportId: string,
+    kind: mediasoup.types.MediaKind,
+    rtpParameters: any,
+  ): Promise<mediasoup.types.Producer> {
     const transport = this.transports.get(transportId);
     if (!transport) {
       throw new Error(`Transport not found: ${transportId}`);
@@ -218,17 +240,21 @@ class MediasoupManager extends EventEmitter {
     const producer = await transport.produce({ kind, rtpParameters });
     this.producers.set(producer.id, producer);
 
-    producer.on('transportclose', () => {
+    producer.on("transportclose", () => {
       producer.close();
       this.producers.delete(producer.id);
     });
 
     console.log(`[Mediasoup] Producer created: ${producer.id} (${kind})`);
-    
+
     return producer;
   }
 
-  async createConsumer(transportId: string, producerId: string, rtpCapabilities: any): Promise<mediasoup.types.Consumer | null> {
+  async createConsumer(
+    transportId: string,
+    producerId: string,
+    rtpCapabilities: any,
+  ): Promise<mediasoup.types.Consumer | null> {
     const transport = this.transports.get(transportId);
     if (!transport) {
       throw new Error(`Transport not found: ${transportId}`);
@@ -239,8 +265,10 @@ class MediasoupManager extends EventEmitter {
       return null;
     }
 
-    if (!transport.router.rtpCapabilities || 
-        !transport.router.canConsume({ producerId, rtpCapabilities })) {
+    if (
+      !transport.router.rtpCapabilities ||
+      !transport.router.canConsume({ producerId, rtpCapabilities })
+    ) {
       console.error(`[Mediasoup] Cannot consume ${producerId}`);
       return null;
     }
@@ -253,18 +281,20 @@ class MediasoupManager extends EventEmitter {
 
     this.consumers.set(consumer.id, consumer);
 
-    consumer.on('transportclose', () => {
+    consumer.on("transportclose", () => {
       consumer.close();
       this.consumers.delete(consumer.id);
     });
 
-    consumer.on('producerclose', () => {
+    consumer.on("producerclose", () => {
       consumer.close();
       this.consumers.delete(consumer.id);
     });
 
-    console.log(`[Mediasoup] Consumer created: ${consumer.id} for producer: ${producerId}`);
-    
+    console.log(
+      `[Mediasoup] Consumer created: ${consumer.id} for producer: ${producerId}`,
+    );
+
     return consumer;
   }
 
@@ -316,7 +346,9 @@ class RTMPFanOutManager extends EventEmitter {
   private activeStreams: Map<string, Set<string>> = new Map();
 
   async startFanOut(streamId: string, platforms: string[], streamKey: string) {
-    console.log(`[RTMP] Starting fan-out for stream: ${streamId} to platforms: ${platforms.join(', ')}`);
+    console.log(
+      `[RTMP] Starting fan-out for stream: ${streamId} to platforms: ${platforms.join(", ")}`,
+    );
 
     if (!this.activeStreams.has(streamId)) {
       this.activeStreams.set(streamId, new Set());
@@ -326,7 +358,9 @@ class RTMPFanOutManager extends EventEmitter {
 
     for (const platform of platforms) {
       if (activePlatforms.has(platform)) {
-        console.log(`[RTMP] Already streaming to ${platform} for stream: ${streamId}`);
+        console.log(
+          `[RTMP] Already streaming to ${platform} for stream: ${streamId}`,
+        );
         continue;
       }
 
@@ -344,14 +378,19 @@ class RTMPFanOutManager extends EventEmitter {
     await this.updateStreamPlatforms(streamId, platforms, true);
   }
 
-  private async startPlatformStream(streamId: string, platform: string, rtmpUrl: string, streamKey: string) {
+  private async startPlatformStream(
+    streamId: string,
+    platform: string,
+    rtmpUrl: string,
+    streamKey: string,
+  ) {
     const processId = `${streamId}:${platform}`;
-    
+
     // Get user's encrypted stream key for this platform
     const { data: streamData, error } = await supabase
-      .from('streams')
+      .from("streams")
       .select(`host:users!inner(${platform}_stream_key)`)
-      .eq('id', streamId)
+      .eq("id", streamId)
       .single();
 
     if (error || !streamData) {
@@ -373,31 +412,31 @@ class RTMPFanOutManager extends EventEmitter {
 
     const ffmpegProcess = ffmpeg()
       .input(`rtmp://localhost:1935/live/${streamKey}`)
-      .inputOptions(['-re', '-fflags +genpts'])
-      .videoCodec('libx264')
-      .audioCodec('aac')
+      .inputOptions(["-re", "-fflags +genpts"])
+      .videoCodec("libx264")
+      .audioCodec("aac")
       .outputOptions([
-        '-preset veryfast',
-        '-tune zerolatency',
-        '-b:v 2500k',
-        '-maxrate 2500k',
-        '-bufsize 5000k',
-        '-pix_fmt yuv420p',
-        '-g 60',
-        '-c:a aac',
-        '-b:a 128k',
-        '-ar 44100',
-        '-f flv',
+        "-preset veryfast",
+        "-tune zerolatency",
+        "-b:v 2500k",
+        "-maxrate 2500k",
+        "-bufsize 5000k",
+        "-pix_fmt yuv420p",
+        "-g 60",
+        "-c:a aac",
+        "-b:a 128k",
+        "-ar 44100",
+        "-f flv",
       ])
       .output(fullRtmpUrl)
-      .on('start', (commandLine) => {
+      .on("start", (commandLine) => {
         console.log(`[RTMP] FFmpeg started for ${platform}: ${commandLine}`);
       })
-      .on('error', (err) => {
+      .on("error", (err) => {
         console.error(`[RTMP] FFmpeg error for ${platform}:`, err.message);
         this.handleStreamError(streamId, platform, err.message);
       })
-      .on('end', () => {
+      .on("end", () => {
         console.log(`[RTMP] FFmpeg ended for ${platform}`);
         this.stopPlatformStream(streamId, platform);
       });
@@ -406,50 +445,56 @@ class RTMPFanOutManager extends EventEmitter {
     this.ffmpegProcesses.set(processId, ffmpegProcess);
 
     // Update relay status
-    await supabase
-      .from('rtmp_relays')
-      .upsert({
+    await supabase.from("rtmp_relays").upsert(
+      {
         stream_id: streamId,
         platform: platform,
-        status: 'active',
+        status: "active",
         connection_started: new Date().toISOString(),
-      }, { onConflict: 'stream_id,platform' });
+      },
+      { onConflict: "stream_id,platform" },
+    );
   }
 
   private decryptStreamKey(encryptedKey: string): string {
     try {
-      const decipher = crypto.createDecipher('aes-256-cbc', ENCRYPTION_KEY);
-      let decrypted = decipher.update(encryptedKey, 'hex', 'utf8');
-      decrypted += decipher.final('utf8');
+      const decipher = crypto.createDecipher("aes-256-cbc", ENCRYPTION_KEY);
+      let decrypted = decipher.update(encryptedKey, "hex", "utf8");
+      decrypted += decipher.final("utf8");
       return decrypted;
     } catch (error) {
-      console.error('[RTMP] Failed to decrypt stream key:', error);
-      return '';
+      console.error("[RTMP] Failed to decrypt stream key:", error);
+      return "";
     }
   }
 
-  private async handleStreamError(streamId: string, platform: string, error: string) {
+  private async handleStreamError(
+    streamId: string,
+    platform: string,
+    error: string,
+  ) {
     console.error(`[RTMP] Stream error for ${platform}:`, error);
-    
-    await supabase
-      .from('rtmp_relays')
-      .upsert({
+
+    await supabase.from("rtmp_relays").upsert(
+      {
         stream_id: streamId,
         platform: platform,
-        status: 'error',
+        status: "error",
         last_error: error,
         connection_ended: new Date().toISOString(),
-      }, { onConflict: 'stream_id,platform' });
+      },
+      { onConflict: "stream_id,platform" },
+    );
 
-    this.emit('streamError', { streamId, platform, error });
+    this.emit("streamError", { streamId, platform, error });
   }
 
   async stopPlatformStream(streamId: string, platform: string) {
     const processId = `${streamId}:${platform}`;
     const ffmpegProcess = this.ffmpegProcesses.get(processId);
-    
+
     if (ffmpegProcess) {
-      ffmpegProcess.kill('SIGTERM');
+      ffmpegProcess.kill("SIGTERM");
       this.ffmpegProcesses.delete(processId);
     }
 
@@ -459,18 +504,21 @@ class RTMPFanOutManager extends EventEmitter {
     }
 
     // Update database
-    await supabase
-      .from('rtmp_relays')
-      .upsert({
+    await supabase.from("rtmp_relays").upsert(
+      {
         stream_id: streamId,
         platform: platform,
-        status: 'inactive',
+        status: "inactive",
         connection_ended: new Date().toISOString(),
-      }, { onConflict: 'stream_id,platform' });
+      },
+      { onConflict: "stream_id,platform" },
+    );
 
     await this.updateStreamPlatforms(streamId, [platform], false);
 
-    console.log(`[RTMP] Stopped streaming to ${platform} for stream: ${streamId}`);
+    console.log(
+      `[RTMP] Stopped streaming to ${platform} for stream: ${streamId}`,
+    );
   }
 
   async stopAllStreams(streamId: string) {
@@ -484,16 +532,17 @@ class RTMPFanOutManager extends EventEmitter {
     console.log(`[RTMP] All streams stopped for: ${streamId}`);
   }
 
-  private async updateStreamPlatforms(streamId: string, platforms: string[], isActive: boolean) {
+  private async updateStreamPlatforms(
+    streamId: string,
+    platforms: string[],
+    isActive: boolean,
+  ) {
     const updates: Record<string, boolean> = {};
-    platforms.forEach(platform => {
+    platforms.forEach((platform) => {
       updates[`streaming_to_${platform}`] = isActive;
     });
 
-    await supabase
-      .from('streams')
-      .update(updates)
-      .eq('id', streamId);
+    await supabase.from("streams").update(updates).eq("id", streamId);
   }
 
   getActiveStreams(): Map<string, Set<string>> {
@@ -507,35 +556,42 @@ const rtmpManager = new RTMPFanOutManager();
 // SWANI AI WRAPPER
 // ============================================
 
+// ============================================
+// SWANI AI WRAPPER (Enhanced)
+// ============================================
+
 class SwaniAIWrapper {
   private apiKey: string;
-  private model: string;
+  private defaultModel: string;
   private apiUrl: string;
 
   constructor() {
-    this.apiKey = process.env.OPENROUTER_API_KEY || '';
-    this.model = process.env.LLM_MODEL || 'anthropic/claude-3.5-sonnet';
-    this.apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+    this.apiKey = process.env.OPENROUTER_API_KEY || "";
+    this.defaultModel = process.env.LLM_MODEL || "anthropic/claude-3.5-sonnet";
+    this.apiUrl = "https://openrouter.ai/api/v1/chat/completions";
   }
 
-  async moderateMessage(message: string, context: any = {}): Promise<{
-    action: 'allow' | 'flag' | 'delete';
+  async moderateMessage(
+    message: string,
+    context: any = {},
+  ): Promise<{
+    action: "allow" | "flag" | "delete";
     confidence: number;
     reason?: string;
   }> {
     try {
       const response = await fetch(this.apiUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': process.env.FRONTEND_URL || 'http://localhost:3000',
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": process.env.FRONTEND_URL || "http://localhost:3000",
         },
         body: JSON.stringify({
-          model: this.model,
+          model: this.defaultModel,
           messages: [
             {
-              role: 'system',
+              role: "system",
               content: `You are a content moderation AI for a live streaming platform. 
 Analyze the following message and determine if it should be allowed, flagged for review, or deleted immediately.
 Consider: hate speech, harassment, spam, explicit content, violence, self-harm, misinformation.
@@ -550,7 +606,7 @@ Respond with a JSON object in this exact format:
 Be strict but fair. Allow casual conversation and mild profanity. Delete only severe violations.`,
             },
             {
-              role: 'user',
+              role: "user",
               content: `Message to moderate: "${message}"\nContext: ${JSON.stringify(context)}`,
             },
           ],
@@ -559,99 +615,240 @@ Be strict but fair. Allow casual conversation and mild profanity. Delete only se
         }),
       });
 
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
       const data = await response.json();
-      const content = data.choices[0]?.message?.content || '';
-
-      // Parse JSON response
+      const content = data.choices[0]?.message?.content || "";
       const result = JSON.parse(content);
       return {
-        action: result.action || 'allow',
+        action: result.action || "allow",
         confidence: result.confidence || 0.5,
         reason: result.reason,
       };
     } catch (error) {
-      console.error('[SwaniAI] Moderation error:', error);
-      // Fail open - allow message if AI fails
-      return { action: 'allow', confidence: 0.0, reason: 'AI moderation failed' };
+      console.error("[SwaniAI] Moderation error:", error);
+      return {
+        action: "allow",
+        confidence: 0.0,
+        reason: "AI moderation failed",
+      };
     }
   }
 
-  async compressMessage(message: string, maxLength: number = 200): Promise<string> {
-    if (message.length <= maxLength) return message;
-
+  async askAI(
+    prompt: string,
+    context: any = {},
+    model?: string,
+  ): Promise<string> {
     try {
+      const selectedModel = model || this.defaultModel;
       const response = await fetch(this.apiUrl, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": process.env.FRONTEND_URL || "http://localhost:3000",
         },
         body: JSON.stringify({
-          model: this.model,
+          model: selectedModel,
           messages: [
             {
-              role: 'system',
-              content: `You are a message compression AI. Compress the following message to be under ${maxLength} characters while preserving the key meaning. Maintain the original language and tone.`,
+              role: "system",
+              content:
+                "You are an AI assistant integrated into a live streaming and watch party platform. Provide helpful, concise, and engaging responses.",
             },
             {
-              role: 'user',
-              content: message,
+              role: "user",
+              content: `Context: ${JSON.stringify(context)}\n\nPrompt: ${prompt}`,
             },
+          ],
+          max_tokens: 500,
+          temperature: 0.7,
+        }),
+      });
+
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
+      const data = await response.json();
+      return data.choices[0]?.message?.content || "";
+    } catch (error) {
+      console.error("[SwaniAI] AI Ask error:", error);
+      return "I am sorry, I am having trouble connecting to my brain right now.";
+    }
+  }
+
+  async compressMessage(
+    message: string,
+    maxLength: number = 200,
+  ): Promise<string> {
+    if (message.length <= maxLength) return message;
+    try {
+      const response = await fetch(this.apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: this.defaultModel,
+          messages: [
+            {
+              role: "system",
+              content: `Compress the following message to be under ${maxLength} characters while preserving the key meaning.`,
+            },
+            { role: "user", content: message },
           ],
           max_tokens: 100,
           temperature: 0.3,
         }),
       });
-
-      if (!response.ok) {
-        return message.substring(0, maxLength) + '...';
-      }
-
+      if (!response.ok) return message.substring(0, maxLength) + "...";
       const data = await response.json();
-      return data.choices[0]?.message?.content || message.substring(0, maxLength) + '...';
+      return (
+        data.choices[0]?.message?.content ||
+        message.substring(0, maxLength) + "..."
+      );
     } catch (error) {
-      return message.substring(0, maxLength) + '...';
-    }
-  }
-
-  async generateStreamTitle(context: any): Promise<string> {
-    try {
-      const response = await fetch(this.apiUrl, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: this.model,
-          messages: [
-            {
-              role: 'system',
-              content: 'Generate an engaging, click-worthy stream title based on the context. Keep it under 60 characters.',
-            },
-            {
-              role: 'user',
-              content: JSON.stringify(context),
-            },
-          ],
-          max_tokens: 50,
-          temperature: 0.8,
-        }),
-      });
-
-      const data = await response.json();
-      return data.choices[0]?.message?.content || 'Live Stream';
-    } catch (error) {
-      return 'Live Stream';
+      return message.substring(0, maxLength) + "...";
     }
   }
 }
 
 const swaniAI = new SwaniAIWrapper();
+
+// ============================================
+// WATCH PARTY MANAGER
+// ============================================
+
+class WatchPartyManager extends EventEmitter {
+  private activeParties: Map<string, any> = new Map();
+
+  async createParty(hostId: string, partyData: any) {
+    const inviteCode = crypto.randomBytes(4).toString("hex").toUpperCase();
+
+    const { data, error } = await supabase
+      .from("watch_parties")
+      .insert({
+        host_id: hostId,
+        title: partyData.title,
+        description: partyData.description,
+        video_url: partyData.videoUrl,
+        video_source: partyData.videoSource || "youtube",
+        video_id: partyData.videoId,
+        invite_code: inviteCode,
+        visibility: partyData.visibility || "public",
+        status: "active",
+      })
+      .select()
+      .single();
+
+    if (error)
+      throw new Error(`Failed to create watch party: ${error.message}`);
+
+    this.activeParties.set(data.id, {
+      hostId,
+      inviteCode,
+      participants: new Map(), // userId -> { socketId, isReady, status }
+      playback: {
+        currentTime: 0,
+        isPlaying: false,
+        lastUpdated: Date.now(),
+      },
+    });
+
+    return data;
+  }
+
+  async joinParty(partyId: string, userId: string, socketId: string) {
+    const party = this.activeParties.get(partyId);
+    if (!party) {
+      // Try to load from DB if not in memory
+      const { data, error } = await supabase
+        .from("watch_parties")
+        .select("*")
+        .eq("id", partyId)
+        .single();
+      if (error || !data) throw new Error("Watch party not found");
+
+      // Initialize in memory
+      this.activeParties.set(data.id, {
+        hostId: data.host_id,
+        inviteCode: data.invite_code,
+        participants: new Map(),
+        playback: {
+          currentTime: data.current_time_seconds || 0,
+          isPlaying: data.is_playing,
+          lastUpdated: Date.now(),
+        },
+      });
+    }
+
+    const { error } = await supabase.from("watch_party_participants").upsert({
+      watch_party_id: partyId,
+      user_id: userId,
+      status: "connected",
+    });
+
+    if (error) throw error;
+
+    const currentParty = this.activeParties.get(partyId);
+    currentParty.participants.set(userId, {
+      socketId,
+      isReady: false,
+      status: "connected",
+    });
+
+    return currentParty;
+  }
+
+  updatePlayback(partyId: string, currentTime: number, isPlaying: boolean) {
+    const party = this.activeParties.get(partyId);
+    if (party) {
+      party.playback = {
+        currentTime,
+        isPlaying,
+        lastUpdated: Date.now(),
+      };
+
+      // debounced update to DB could go here
+    }
+  }
+
+  async setReadyStatus(partyId: string, userId: string, isReady: boolean) {
+    const party = this.activeParties.get(partyId);
+    if (party) {
+      const participant = party.participants.get(userId);
+      if (participant) {
+        participant.isReady = isReady;
+
+        await supabase
+          .from("watch_party_participants")
+          .update({
+            is_ready: isReady,
+            status: isReady ? "ready" : "connected",
+          })
+          .eq("watch_party_id", partyId)
+          .eq("user_id", userId);
+
+        return true;
+      }
+    }
+    return false;
+  }
+
+  getPartyByInviteCode(inviteCode: string) {
+    return Array.from(this.activeParties.values()).find(
+      (p) => p.inviteCode === inviteCode,
+    );
+  }
+
+  removeParticipant(partyId: string, userId: string) {
+    const party = this.activeParties.get(partyId);
+    if (party) {
+      party.participants.delete(userId);
+    }
+  }
+}
+
+const watchPartyManager = new WatchPartyManager();
 
 // ============================================
 // STREAM MANAGER
@@ -661,24 +858,24 @@ class StreamManager extends EventEmitter {
   private activeStreams: Map<string, any> = new Map();
 
   async createStream(hostId: string, streamData: any) {
-    const streamKey = crypto.randomBytes(16).toString('hex');
-    
+    const streamKey = crypto.randomBytes(16).toString("hex");
+
     const { data, error } = await supabase
-      .from('streams')
+      .from("streams")
       .insert({
         host_id: hostId,
         title: streamData.title,
         description: streamData.description,
         category_id: streamData.categoryId,
-        visibility: streamData.visibility || 'public',
+        visibility: streamData.visibility || "public",
         scheduled_start: streamData.scheduledStart,
-        status: 'scheduled',
+        status: "scheduled",
         stream_key: streamKey,
         layout_config: {
-          type: 'gold_board_grid',
-          host_position: 'top_left',
+          type: "gold_board_grid",
+          host_position: "top_left",
           guest_slots: 20,
-          scroll_direction: 'vertical',
+          scroll_direction: "vertical",
         },
       })
       .select()
@@ -693,17 +890,17 @@ class StreamManager extends EventEmitter {
 
   async goLive(streamId: string, platforms: string[] = []) {
     const { data: stream, error } = await supabase
-      .from('streams')
+      .from("streams")
       .update({
-        status: 'live',
+        status: "live",
         actual_start: new Date().toISOString(),
       })
-      .eq('id', streamId)
+      .eq("id", streamId)
       .select()
       .single();
 
     if (error || !stream) {
-      throw new Error('Failed to start stream');
+      throw new Error("Failed to start stream");
     }
 
     // Initialize Mediasoup router for this stream
@@ -721,22 +918,22 @@ class StreamManager extends EventEmitter {
       guests: new Map(), // peerId -> grid position
     });
 
-    this.emit('streamStarted', { streamId, hostId: stream.host_id });
-    
+    this.emit("streamStarted", { streamId, hostId: stream.host_id });
+
     return stream;
   }
 
   async endStream(streamId: string) {
     const { error } = await supabase
-      .from('streams')
+      .from("streams")
       .update({
-        status: 'ended',
+        status: "ended",
         ended_at: new Date().toISOString(),
       })
-      .eq('id', streamId);
+      .eq("id", streamId);
 
     if (error) {
-      console.error('Failed to end stream:', error);
+      console.error("Failed to end stream:", error);
     }
 
     // Stop RTMP fan-out
@@ -747,7 +944,7 @@ class StreamManager extends EventEmitter {
 
     const streamData = this.activeStreams.get(streamId);
     if (streamData) {
-      this.emit('streamEnded', {
+      this.emit("streamEnded", {
         streamId,
         hostId: streamData.hostId,
         duration: Date.now() - streamData.startTime.getTime(),
@@ -763,7 +960,11 @@ class StreamManager extends EventEmitter {
     return this.activeStreams.get(streamId);
   }
 
-  getAllActiveStreams(): Array<{ streamId: string; hostId: string; viewerCount: number }> {
+  getAllActiveStreams(): Array<{
+    streamId: string;
+    hostId: string;
+    viewerCount: number;
+  }> {
     return Array.from(this.activeStreams.entries()).map(([streamId, data]) => ({
       streamId,
       hostId: data.hostId,
@@ -775,22 +976,22 @@ class StreamManager extends EventEmitter {
     const stream = this.activeStreams.get(streamId);
     if (stream) {
       stream.viewers.add(viewerId);
-      
+
       // Update current viewers count
       await supabase
-        .from('streams')
+        .from("streams")
         .update({
           current_viewers: stream.viewers.size,
-          total_views: supabase.rpc('increment', { row_id: streamId }),
+          total_views: supabase.rpc("increment", { row_id: streamId }),
         })
-        .eq('id', streamId);
+        .eq("id", streamId);
 
       if (!stream.maxViewers || stream.viewers.size > stream.maxViewers) {
         stream.maxViewers = stream.viewers.size;
         await supabase
-          .from('streams')
+          .from("streams")
           .update({ max_viewers: stream.maxViewers })
-          .eq('id', streamId);
+          .eq("id", streamId);
       }
     }
   }
@@ -799,24 +1000,28 @@ class StreamManager extends EventEmitter {
     const stream = this.activeStreams.get(streamId);
     if (stream) {
       stream.viewers.delete(viewerId);
-      
+
       await supabase
-        .from('streams')
+        .from("streams")
         .update({ current_viewers: stream.viewers.size })
-        .eq('id', streamId);
+        .eq("id", streamId);
     }
   }
 
-  async addGuest(streamId: string, userId: string, gridPosition: number): Promise<string> {
+  async addGuest(
+    streamId: string,
+    userId: string,
+    gridPosition: number,
+  ): Promise<string> {
     const stream = this.activeStreams.get(streamId);
     if (!stream) {
-      throw new Error('Stream not found');
+      throw new Error("Stream not found");
     }
 
     // Check if position is available
     for (const [_, pos] of stream.guests.entries()) {
       if (pos === gridPosition) {
-        throw new Error('Grid position already occupied');
+        throw new Error("Grid position already occupied");
       }
     }
 
@@ -828,18 +1033,16 @@ class StreamManager extends EventEmitter {
     });
 
     // Update database
-    await supabase
-      .from('stream_guests')
-      .insert({
-        stream_id: streamId,
-        user_id: userId,
-        grid_position: gridPosition,
-        status: 'connected',
-        joined_at: new Date().toISOString(),
-      });
+    await supabase.from("stream_guests").insert({
+      stream_id: streamId,
+      user_id: userId,
+      grid_position: gridPosition,
+      status: "connected",
+      joined_at: new Date().toISOString(),
+    });
 
-    this.emit('guestJoined', { streamId, guestId, userId, gridPosition });
-    
+    this.emit("guestJoined", { streamId, guestId, userId, gridPosition });
+
     return guestId;
   }
 
@@ -850,15 +1053,15 @@ class StreamManager extends EventEmitter {
       stream.guests.delete(guestId);
 
       await supabase
-        .from('stream_guests')
+        .from("stream_guests")
         .update({
-          status: 'disconnected',
+          status: "disconnected",
           left_at: new Date().toISOString(),
         })
-        .eq('stream_id', streamId)
-        .eq('user_id', guest.userId);
+        .eq("stream_id", streamId)
+        .eq("user_id", guest.userId);
 
-      this.emit('guestLeft', { streamId, guestId, userId: guest.userId });
+      this.emit("guestLeft", { streamId, guestId, userId: guest.userId });
     }
   }
 }
@@ -870,9 +1073,9 @@ const streamManager = new StreamManager();
 // ============================================
 
 // Health Check
-app.get('/health', (req, res) => {
+app.get("/health", (req, res) => {
   res.json({
-    status: 'ok',
+    status: "ok",
     timestamp: new Date().toISOString(),
     mediasoup: mediasoupManager.getStats(),
     activeStreams: streamManager.getAllActiveStreams().length,
@@ -880,27 +1083,30 @@ app.get('/health', (req, res) => {
 });
 
 // Get Mediasoup Router RTP Capabilities
-app.get('/api/streams/:streamId/rtp-capabilities', async (req, res) => {
+app.get("/api/streams/:streamId/rtp-capabilities", async (req, res) => {
   try {
     const { streamId } = req.params;
     const router = await mediasoupManager.createRouter(streamId);
-    
+
     res.json({
       rtpCapabilities: router.rtpCapabilities,
     });
   } catch (error) {
-    console.error('Error getting RTP capabilities:', error);
-    res.status(500).json({ error: 'Failed to get RTP capabilities' });
+    console.error("Error getting RTP capabilities:", error);
+    res.status(500).json({ error: "Failed to get RTP capabilities" });
   }
 });
 
 // Create WebRTC Transport
-app.post('/api/streams/:streamId/transport', async (req, res) => {
+app.post("/api/streams/:streamId/transport", async (req, res) => {
   try {
     const { streamId } = req.params;
     const { peerId, direction } = req.body;
 
-    const transport = await mediasoupManager.createWebRtcTransport(streamId, peerId);
+    const transport = await mediasoupManager.createWebRtcTransport(
+      streamId,
+      peerId,
+    );
 
     res.json({
       transportId: transport.id,
@@ -909,84 +1115,95 @@ app.post('/api/streams/:streamId/transport', async (req, res) => {
       dtlsParameters: transport.dtlsParameters,
     });
   } catch (error) {
-    console.error('Error creating transport:', error);
-    res.status(500).json({ error: 'Failed to create transport' });
+    console.error("Error creating transport:", error);
+    res.status(500).json({ error: "Failed to create transport" });
   }
 });
 
 // Connect Transport
-app.post('/api/streams/:streamId/transport/:transportId/connect', async (req, res) => {
-  try {
-    const { streamId, transportId } = req.params;
-    const { dtlsParameters } = req.body;
+app.post(
+  "/api/streams/:streamId/transport/:transportId/connect",
+  async (req, res) => {
+    try {
+      const { streamId, transportId } = req.params;
+      const { dtlsParameters } = req.body;
 
-    const transport = mediasoupManager.transports?.get(`${streamId}:${transportId}`);
-    if (!transport) {
-      return res.status(404).json({ error: 'Transport not found' });
+      const transport = mediasoupManager.transports?.get(
+        `${streamId}:${transportId}`,
+      );
+      if (!transport) {
+        return res.status(404).json({ error: "Transport not found" });
+      }
+
+      await transport.connect({ dtlsParameters });
+      res.json({ connected: true });
+    } catch (error) {
+      console.error("Error connecting transport:", error);
+      res.status(500).json({ error: "Failed to connect transport" });
     }
-
-    await transport.connect({ dtlsParameters });
-    res.json({ connected: true });
-  } catch (error) {
-    console.error('Error connecting transport:', error);
-    res.status(500).json({ error: 'Failed to connect transport' });
-  }
-});
+  },
+);
 
 // Produce (Publish media)
-app.post('/api/streams/:streamId/transport/:transportId/produce', async (req, res) => {
-  try {
-    const { streamId, transportId } = req.params;
-    const { kind, rtpParameters } = req.body;
+app.post(
+  "/api/streams/:streamId/transport/:transportId/produce",
+  async (req, res) => {
+    try {
+      const { streamId, transportId } = req.params;
+      const { kind, rtpParameters } = req.body;
 
-    const producer = await mediasoupManager.createProducer(
-      `${streamId}:${transportId}`,
-      kind,
-      rtpParameters
-    );
+      const producer = await mediasoupManager.createProducer(
+        `${streamId}:${transportId}`,
+        kind,
+        rtpParameters,
+      );
 
-    res.json({
-      producerId: producer.id,
-    });
-  } catch (error) {
-    console.error('Error producing:', error);
-    res.status(500).json({ error: 'Failed to produce' });
-  }
-});
+      res.json({
+        producerId: producer.id,
+      });
+    } catch (error) {
+      console.error("Error producing:", error);
+      res.status(500).json({ error: "Failed to produce" });
+    }
+  },
+);
 
 // Consume (Subscribe to media)
-app.post('/api/streams/:streamId/transport/:transportId/consume', async (req, res) => {
-  try {
-    const { streamId, transportId } = req.params;
-    const { producerId, rtpCapabilities } = req.body;
+app.post(
+  "/api/streams/:streamId/transport/:transportId/consume",
+  async (req, res) => {
+    try {
+      const { streamId, transportId } = req.params;
+      const { producerId, rtpCapabilities } = req.body;
 
-    const consumer = await mediasoupManager.createConsumer(
-      `${streamId}:${transportId}`,
-      producerId,
-      rtpCapabilities
-    );
+      const consumer = await mediasoupManager.createConsumer(
+        `${streamId}:${transportId}`,
+        producerId,
+        rtpCapabilities,
+      );
 
-    if (!consumer) {
-      return res.status(400).json({ error: 'Cannot consume' });
+      if (!consumer) {
+        return res.status(400).json({ error: "Cannot consume" });
+      }
+
+      res.json({
+        consumerId: consumer.id,
+        producerId: consumer.producerId,
+        kind: consumer.kind,
+        rtpParameters: consumer.rtpParameters,
+      });
+    } catch (error) {
+      console.error("Error consuming:", error);
+      res.status(500).json({ error: "Failed to consume" });
     }
-
-    res.json({
-      consumerId: consumer.id,
-      producerId: consumer.producerId,
-      kind: consumer.kind,
-      rtpParameters: consumer.rtpParameters,
-    });
-  } catch (error) {
-    console.error('Error consuming:', error);
-    res.status(500).json({ error: 'Failed to consume' });
-  }
-});
+  },
+);
 
 // Get active producers in a room
-app.get('/api/streams/:streamId/producers', (req, res) => {
+app.get("/api/streams/:streamId/producers", (req, res) => {
   const { streamId } = req.params;
   const router = mediasoupManager.getRouter(streamId);
-  
+
   if (!router) {
     return res.json({ producers: [] });
   }
@@ -996,12 +1213,12 @@ app.get('/api/streams/:streamId/producers', (req, res) => {
 });
 
 // Get active streams
-app.get('/api/streams', async (req, res) => {
+app.get("/api/streams", async (req, res) => {
   try {
     const { data, error } = await supabase
-      .from('active_live_streams')
-      .select('*')
-      .order('actual_start', { ascending: false });
+      .from("active_live_streams")
+      .select("*")
+      .order("actual_start", { ascending: false });
 
     if (error) {
       throw error;
@@ -1009,48 +1226,50 @@ app.get('/api/streams', async (req, res) => {
 
     res.json(data);
   } catch (error) {
-    console.error('Error fetching streams:', error);
-    res.status(500).json({ error: 'Failed to fetch streams' });
+    console.error("Error fetching streams:", error);
+    res.status(500).json({ error: "Failed to fetch streams" });
   }
 });
 
 // Get stream by ID
-app.get('/api/streams/:streamId', async (req, res) => {
+app.get("/api/streams/:streamId", async (req, res) => {
   try {
     const { streamId } = req.params;
-    
+
     const { data, error } = await supabase
-      .from('streams')
-      .select('*, host:users!host_id(username, display_name, avatar_url, verification_status)')
-      .eq('id', streamId)
+      .from("streams")
+      .select(
+        "*, host:users!host_id(username, display_name, avatar_url, verification_status)",
+      )
+      .eq("id", streamId)
       .single();
 
     if (error) {
-      return res.status(404).json({ error: 'Stream not found' });
+      return res.status(404).json({ error: "Stream not found" });
     }
 
     res.json(data);
   } catch (error) {
-    console.error('Error fetching stream:', error);
-    res.status(500).json({ error: 'Failed to fetch stream' });
+    console.error("Error fetching stream:", error);
+    res.status(500).json({ error: "Failed to fetch stream" });
   }
 });
 
 // Create stream
-app.post('/api/streams', async (req, res) => {
+app.post("/api/streams", async (req, res) => {
   try {
     const { hostId, ...streamData } = req.body;
-    
+
     const stream = await streamManager.createStream(hostId, streamData);
     res.status(201).json(stream);
   } catch (error) {
-    console.error('Error creating stream:', error);
-    res.status(500).json({ error: 'Failed to create stream' });
+    console.error("Error creating stream:", error);
+    res.status(500).json({ error: "Failed to create stream" });
   }
 });
 
 // Start streaming (go live)
-app.post('/api/streams/:streamId/go-live', async (req, res) => {
+app.post("/api/streams/:streamId/go-live", async (req, res) => {
   try {
     const { streamId } = req.params;
     const { platforms } = req.body;
@@ -1058,37 +1277,39 @@ app.post('/api/streams/:streamId/go-live', async (req, res) => {
     const stream = await streamManager.goLive(streamId, platforms);
     res.json(stream);
   } catch (error) {
-    console.error('Error going live:', error);
-    res.status(500).json({ error: 'Failed to start stream' });
+    console.error("Error going live:", error);
+    res.status(500).json({ error: "Failed to start stream" });
   }
 });
 
 // End stream
-app.post('/api/streams/:streamId/end', async (req, res) => {
+app.post("/api/streams/:streamId/end", async (req, res) => {
   try {
     const { streamId } = req.params;
-    
+
     await streamManager.endStream(streamId);
     res.json({ success: true });
   } catch (error) {
-    console.error('Error ending stream:', error);
-    res.status(500).json({ error: 'Failed to end stream' });
+    console.error("Error ending stream:", error);
+    res.status(500).json({ error: "Failed to end stream" });
   }
 });
 
 // Get user payment handles (for donation buttons)
-app.get('/api/users/:userId/payment-handles', async (req, res) => {
+app.get("/api/users/:userId/payment-handles", async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
     const { data, error } = await supabase
-      .from('users')
-      .select('paypal_handle, cashapp_handle, venmo_handle, zelle_handle, chime_handle, display_name')
-      .eq('id', userId)
+      .from("users")
+      .select(
+        "paypal_handle, cashapp_handle, venmo_handle, zelle_handle, chime_handle, display_name",
+      )
+      .eq("id", userId)
       .single();
 
     if (error) {
-      return res.status(404).json({ error: 'User not found' });
+      return res.status(404).json({ error: "User not found" });
     }
 
     // Only return handles that are configured
@@ -1104,19 +1325,19 @@ app.get('/api/users/:userId/payment-handles', async (req, res) => {
       handles,
     });
   } catch (error) {
-    console.error('Error fetching payment handles:', error);
-    res.status(500).json({ error: 'Failed to fetch payment handles' });
+    console.error("Error fetching payment handles:", error);
+    res.status(500).json({ error: "Failed to fetch payment handles" });
   }
 });
 
 // Update user payment handles
-app.put('/api/users/:userId/payment-handles', async (req, res) => {
+app.put("/api/users/:userId/payment-handles", async (req, res) => {
   try {
     const { userId } = req.params;
     const updates = req.body;
 
     const { data, error } = await supabase
-      .from('users')
+      .from("users")
       .update({
         paypal_handle: updates.paypal,
         cashapp_handle: updates.cashapp,
@@ -1124,7 +1345,7 @@ app.put('/api/users/:userId/payment-handles', async (req, res) => {
         zelle_handle: updates.zelle,
         chime_handle: updates.chime,
       })
-      .eq('id', userId)
+      .eq("id", userId)
       .select()
       .single();
 
@@ -1134,28 +1355,28 @@ app.put('/api/users/:userId/payment-handles', async (req, res) => {
 
     res.json(data);
   } catch (error) {
-    console.error('Error updating payment handles:', error);
-    res.status(500).json({ error: 'Failed to update payment handles' });
+    console.error("Error updating payment handles:", error);
+    res.status(500).json({ error: "Failed to update payment handles" });
   }
 });
 
 // Update stream keys (encrypted)
-app.put('/api/users/:userId/stream-keys', async (req, res) => {
+app.put("/api/users/:userId/stream-keys", async (req, res) => {
   try {
     const { userId } = req.params;
     const { platform, streamKey } = req.body;
 
     // Encrypt the stream key
-    const cipher = crypto.createCipher('aes-256-cbc', ENCRYPTION_KEY);
-    let encrypted = cipher.update(streamKey, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
+    const cipher = crypto.createCipher("aes-256-cbc", ENCRYPTION_KEY);
+    let encrypted = cipher.update(streamKey, "utf8", "hex");
+    encrypted += cipher.final("hex");
 
     const columnName = `${platform}_stream_key`;
-    
+
     const { data, error } = await supabase
-      .from('users')
+      .from("users")
       .update({ [columnName]: encrypted })
-      .eq('id', userId)
+      .eq("id", userId)
       .select()
       .single();
 
@@ -1165,8 +1386,8 @@ app.put('/api/users/:userId/stream-keys', async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error updating stream key:', error);
-    res.status(500).json({ error: 'Failed to update stream key' });
+    console.error("Error updating stream key:", error);
+    res.status(500).json({ error: "Failed to update stream key" });
   }
 });
 
@@ -1174,122 +1395,136 @@ app.put('/api/users/:userId/stream-keys', async (req, res) => {
 // SOCKET.IO HANDLERS
 // ============================================
 
-io.on('connection', (socket) => {
+io.on("connection", (socket) => {
   console.log(`[Socket] Client connected: ${socket.id}`);
 
   // Join stream room
-  socket.on('join-stream', async ({ streamId, userId, isHost }) => {
+  socket.on("join-stream", async ({ streamId, userId, isHost }) => {
     try {
       socket.join(streamId);
-      
+
       if (!isHost) {
         await streamManager.addViewer(streamId, userId || socket.id);
       }
 
       // Get RTP capabilities for the room
       const router = await mediasoupManager.createRouter(streamId);
-      
-      socket.emit('joined-stream', {
+
+      socket.emit("joined-stream", {
         streamId,
         rtpCapabilities: router.rtpCapabilities,
       });
 
       // Notify others
-      socket.to(streamId).emit('viewer-joined', {
+      socket.to(streamId).emit("viewer-joined", {
         userId: userId || socket.id,
         timestamp: new Date().toISOString(),
       });
 
       console.log(`[Socket] ${socket.id} joined stream: ${streamId}`);
     } catch (error) {
-      console.error('[Socket] Error joining stream:', error);
-      socket.emit('error', { message: 'Failed to join stream' });
+      console.error("[Socket] Error joining stream:", error);
+      socket.emit("error", { message: "Failed to join stream" });
     }
   });
 
   // Leave stream room
-  socket.on('leave-stream', async ({ streamId, userId }) => {
+  socket.on("leave-stream", async ({ streamId, userId }) => {
     try {
       socket.leave(streamId);
       await streamManager.removeViewer(streamId, userId || socket.id);
-      
-      socket.to(streamId).emit('viewer-left', {
+
+      socket.to(streamId).emit("viewer-left", {
         userId: userId || socket.id,
         timestamp: new Date().toISOString(),
       });
 
       console.log(`[Socket] ${socket.id} left stream: ${streamId}`);
     } catch (error) {
-      console.error('[Socket] Error leaving stream:', error);
+      console.error("[Socket] Error leaving stream:", error);
     }
   });
 
   // WebRTC Signaling - Connect Transport
-  socket.on('connect-transport', async ({ streamId, transportId, dtlsParameters }, callback) => {
-    try {
-      const transport = mediasoupManager['transports']?.get(`${streamId}:${transportId}`);
-      if (!transport) {
-        return callback({ error: 'Transport not found' });
-      }
+  socket.on(
+    "connect-transport",
+    async ({ streamId, transportId, dtlsParameters }, callback) => {
+      try {
+        const transport = mediasoupManager["transports"]?.get(
+          `${streamId}:${transportId}`,
+        );
+        if (!transport) {
+          return callback({ error: "Transport not found" });
+        }
 
-      await transport.connect({ dtlsParameters });
-      callback({ success: true });
-    } catch (error) {
-      console.error('[Socket] Error connecting transport:', error);
-      callback({ error: error.message });
-    }
-  });
+        await transport.connect({ dtlsParameters });
+        callback({ success: true });
+      } catch (error) {
+        console.error("[Socket] Error connecting transport:", error);
+        callback({ error: error.message });
+      }
+    },
+  );
 
   // WebRTC Signaling - Produce
-  socket.on('produce', async ({ streamId, transportId, kind, rtpParameters }, callback) => {
-    try {
-      const producer = await mediasoupManager.createProducer(
-        `${streamId}:${transportId}`,
-        kind,
-        rtpParameters
-      );
+  socket.on(
+    "produce",
+    async ({ streamId, transportId, kind, rtpParameters }, callback) => {
+      try {
+        const producer = await mediasoupManager.createProducer(
+          `${streamId}:${transportId}`,
+          kind,
+          rtpParameters,
+        );
 
-      callback({ producerId: producer.id });
+        callback({ producerId: producer.id });
 
-      // Notify all clients in the room about the new producer
-      socket.to(streamId).emit('new-producer', {
-        producerId: producer.id,
-        kind,
-        socketId: socket.id,
-      });
-    } catch (error) {
-      console.error('[Socket] Error producing:', error);
-      callback({ error: error.message });
-    }
-  });
+        // Notify all clients in the room about the new producer
+        socket.to(streamId).emit("new-producer", {
+          producerId: producer.id,
+          kind,
+          socketId: socket.id,
+        });
+      } catch (error) {
+        console.error("[Socket] Error producing:", error);
+        callback({ error: error.message });
+      }
+    },
+  );
 
   // WebRTC Signaling - Consume
-  socket.on('consume', async ({ streamId, transportId, producerId, rtpCapabilities }, callback) => {
-    try {
-      const consumer = await mediasoupManager.createConsumer(
-        `${streamId}:${transportId}`,
-        producerId,
-        rtpCapabilities
-      );
+  socket.on(
+    "consume",
+    async (
+      { streamId, transportId, producerId, rtpCapabilities },
+      callback,
+    ) => {
+      try {
+        const consumer = await mediasoupManager.createConsumer(
+          `${streamId}:${transportId}`,
+          producerId,
+          rtpCapabilities,
+        );
 
-      if (!consumer) {
-        return callback({ error: 'Cannot consume' });
+        if (!consumer) {
+          return callback({ error: "Cannot consume" });
+        }
+
+        callback({
+          consumerId: consumer.id,
+          producerId: consumer.producerId,
+          kind: consumer.kind,
+          rtpParameters: consumer.rtpParameters,
+        });
+      } catch (error) {
+        console.error("[Socket] Error consuming:", error);
+        callback({ error: error.message });
       }
-
-      callback({
-        consumerId: consumer.id,
-        producerId: consumer.producerId,
-        kind: consumer.kind,
-        rtpParameters: consumer.rtpParameters,
-      });
-    } catch (error) {
-      console.error('[Socket] Error consuming:', error);
-      callback({ error: error.message });
-    }
-  });
+    },
+  );
 
   // Chat message with AI moderation
-  socket.on('chat-message', async ({ streamId, message, userId, username }) => {
+  socket.on("chat-message", async ({ streamId, message, userId, username }) => {
     try {
       // AI Moderation
       const moderation = await swaniAI.moderateMessage(message, {
@@ -1300,15 +1535,16 @@ io.on('connection', (socket) => {
 
       // Store message in database
       const { data, error } = await supabase
-        .from('chat_messages')
+        .from("chat_messages")
         .insert({
           stream_id: streamId,
           user_id: userId,
-          message: moderation.action === 'delete' ? '[Message removed]' : message,
+          message:
+            moderation.action === "delete" ? "[Message removed]" : message,
           ai_moderated: true,
           ai_confidence: moderation.confidence,
           ai_action: moderation.action,
-          is_deleted: moderation.action === 'delete',
+          is_deleted: moderation.action === "delete",
         })
         .select()
         .single();
@@ -1318,87 +1554,94 @@ io.on('connection', (socket) => {
       }
 
       // Broadcast message (or moderation notice)
-      if (moderation.action === 'delete') {
-        socket.emit('message-rejected', {
+      if (moderation.action === "delete") {
+        socket.emit("message-rejected", {
           reason: moderation.reason,
           confidence: moderation.confidence,
         });
       } else {
-        io.to(streamId).emit('chat-message', {
+        io.to(streamId).emit("chat-message", {
           id: data.id,
           userId,
           username,
-          message: moderation.action === 'flag' 
-            ? `[Flagged] ${message}` 
-            : message,
+          message:
+            moderation.action === "flag" ? `[Flagged] ${message}` : message,
           timestamp: data.created_at,
         });
       }
 
       // Log flagged messages for review
-      if (moderation.action === 'flag') {
-        console.log(`[Moderation] Flagged message in stream ${streamId}: ${message.substring(0, 50)}...`);
+      if (moderation.action === "flag") {
+        console.log(
+          `[Moderation] Flagged message in stream ${streamId}: ${message.substring(0, 50)}...`,
+        );
       }
     } catch (error) {
-      console.error('[Socket] Error handling chat message:', error);
-      socket.emit('error', { message: 'Failed to send message' });
+      console.error("[Socket] Error handling chat message:", error);
+      socket.emit("error", { message: "Failed to send message" });
     }
   });
 
   // Guest panel management
-  socket.on('join-as-guest', async ({ streamId, userId, gridPosition }) => {
+  socket.on("join-as-guest", async ({ streamId, userId, gridPosition }) => {
     try {
-      const guestId = await streamManager.addGuest(streamId, userId, gridPosition);
-      
-      socket.emit('guest-assigned', {
+      const guestId = await streamManager.addGuest(
+        streamId,
+        userId,
+        gridPosition,
+      );
+
+      socket.emit("guest-assigned", {
         guestId,
         gridPosition,
       });
 
       // Notify host and other viewers
-      socket.to(streamId).emit('guest-joined-panel', {
+      socket.to(streamId).emit("guest-joined-panel", {
         guestId,
         userId,
         gridPosition,
       });
 
-      console.log(`[Socket] Guest ${userId} joined panel at position ${gridPosition} in stream ${streamId}`);
+      console.log(
+        `[Socket] Guest ${userId} joined panel at position ${gridPosition} in stream ${streamId}`,
+      );
     } catch (error) {
-      console.error('[Socket] Error joining as guest:', error);
-      socket.emit('error', { message: error.message });
+      console.error("[Socket] Error joining as guest:", error);
+      socket.emit("error", { message: error.message });
     }
   });
 
-  socket.on('leave-as-guest', async ({ streamId, guestId }) => {
+  socket.on("leave-as-guest", async ({ streamId, guestId }) => {
     try {
       await streamManager.removeGuest(streamId, guestId);
-      
-      socket.to(streamId).emit('guest-left-panel', {
+
+      socket.to(streamId).emit("guest-left-panel", {
         guestId,
       });
 
       console.log(`[Socket] Guest ${guestId} left panel in stream ${streamId}`);
     } catch (error) {
-      console.error('[Socket] Error leaving as guest:', error);
+      console.error("[Socket] Error leaving as guest:", error);
     }
   });
 
   // Host controls
-  socket.on('mute-guest', ({ streamId, guestId }) => {
-    socket.to(streamId).emit('guest-muted', { guestId });
+  socket.on("mute-guest", ({ streamId, guestId }) => {
+    socket.to(streamId).emit("guest-muted", { guestId });
   });
 
-  socket.on('unmute-guest', ({ streamId, guestId }) => {
-    socket.to(streamId).emit('guest-unmuted', { guestId });
+  socket.on("unmute-guest", ({ streamId, guestId }) => {
+    socket.to(streamId).emit("guest-unmuted", { guestId });
   });
 
-  socket.on('remove-guest', ({ streamId, guestId }) => {
-    socket.to(streamId).emit('guest-removed', { guestId });
+  socket.on("remove-guest", ({ streamId, guestId }) => {
+    socket.to(streamId).emit("guest-removed", { guestId });
   });
 
   // Watch party sync
-  socket.on('sync-watch-party', ({ streamId, timestamp, isPlaying }) => {
-    socket.to(streamId).emit('watch-party-sync', {
+  socket.on("sync-watch-party", ({ streamId, timestamp, isPlaying }) => {
+    socket.to(streamId).emit("watch-party-sync", {
       timestamp,
       isPlaying,
       senderId: socket.id,
@@ -1406,8 +1649,8 @@ io.on('connection', (socket) => {
   });
 
   // Payment notification (for live display)
-  socket.on('payment-sent', ({ streamId, amount, senderName, message }) => {
-    socket.to(streamId).emit('payment-notification', {
+  socket.on("payment-sent", ({ streamId, amount, senderName, message }) => {
+    socket.to(streamId).emit("payment-notification", {
       amount,
       senderName,
       message,
@@ -1416,7 +1659,7 @@ io.on('connection', (socket) => {
   });
 
   // Disconnect handler
-  socket.on('disconnect', () => {
+  socket.on("disconnect", () => {
     console.log(`[Socket] Client disconnected: ${socket.id}`);
   });
 });
@@ -1450,35 +1693,39 @@ async function startServer() {
       `);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
+    console.error("Failed to start server:", error);
     process.exit(1);
   }
 }
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully...');
-  
+process.on("SIGTERM", async () => {
+  console.log("SIGTERM received, shutting down gracefully...");
+
   // Close all active streams
-  for (const streamId of streamManager.getAllActiveStreams().map(s => s.streamId)) {
+  for (const streamId of streamManager
+    .getAllActiveStreams()
+    .map((s) => s.streamId)) {
     await streamManager.endStream(streamId);
   }
-  
+
   httpServer.close(() => {
-    console.log('Server closed');
+    console.log("Server closed");
     process.exit(0);
   });
 });
 
-process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully...');
-  
-  for (const streamId of streamManager.getAllActiveStreams().map(s => s.streamId)) {
+process.on("SIGINT", async () => {
+  console.log("SIGINT received, shutting down gracefully...");
+
+  for (const streamId of streamManager
+    .getAllActiveStreams()
+    .map((s) => s.streamId)) {
     await streamManager.endStream(streamId);
   }
-  
+
   httpServer.close(() => {
-    console.log('Server closed');
+    console.log("Server closed");
     process.exit(0);
   });
 });
