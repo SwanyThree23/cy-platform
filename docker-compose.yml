@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   # ============================================
@@ -109,7 +109,7 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    command: sh -c "npm install && npm start"
+    command: sh -c "npm install --no-audit --no-fund --legacy-peer-deps && npm start"
 
   # ============================================
   # Nginx Reverse Proxy
