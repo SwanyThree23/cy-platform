@@ -1657,10 +1657,10 @@ io.on("connection", (socket) => {
       socket.emit("watch-party-joined", {
         partyId,
         playback: party.playback,
-        participants: Array.from(party.participants.entries()).map(([uId, p]) => ({
-          userId: uId,
-          isReady: p.isReady,
-          status: p.status,
+        participants: Array.from(party.participants.entries()).map((item: any) => ({
+          userId: item[0],
+          isReady: item[1].isReady,
+          status: item[1].status,
         })),
       });
 
@@ -1670,9 +1670,9 @@ io.on("connection", (socket) => {
       });
 
       console.log(`[Socket] User ${userId} joined watch party ${partyId}`);
-    } catch (error) {
-      console.error("[Socket] Error joining watch party:", error);
-      socket.emit("error", { message: error.message });
+    } catch (error: any) {
+      console.error('[Socket] Error joining watch party:', error);
+      socket.emit('error', { message: error.message });
     }
   });
 
@@ -1694,7 +1694,7 @@ io.on("connection", (socket) => {
   });
 
   // AI Assistance in Watch Party
-  socket.on("ask-party-ai", async ({ partyId, prompt, userId, username, model }) => {
+  socket.on("ask-party-ai", async ({ partyId, prompt, userId: _userId, username, model }) => {
     try {
       // Get context (last messages or current video info)
       const context = { partyId, triggerUser: username };
