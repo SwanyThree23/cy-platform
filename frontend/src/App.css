@@ -701,3 +701,70 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--gold-primary);
 }
+
+/* Inline Styles Replacements */
+.payment-btn.paypal { background-color: #003087; }
+.payment-btn.cashapp { background-color: #00D632; }
+.payment-btn.venmo { background-color: #008CFF; }
+.payment-btn.zelle { background-color: #6B1F7C; }
+.payment-btn.chime { background-color: #25C281; }
+
+.ready-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.invite-label {
+  color: var(--light-gray);
+  font-size: 0.8rem;
+}
+
+.leave-party-btn {
+  background: var(--gold-dark);
+}
+
+.watch-parties-section {
+  margin-top: 2rem;
+}
+
+.party-card {
+  border-left: 4px solid var(--accent);
+}
+
+.party-thumbnail {
+  background: var(--dark-gray);
+}
+
+.party-badge {
+  background: var(--accent);
+}
+
+.start-party-btn {
+  margin-top: 1rem;
+  background: var(--medium-gray);
+  color: var(--gold-primary);
+  border: 1px solid var(--gold-dark);
+}
+
+.join-party-container {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--black);
+  border-radius: 8px;
+}
+
+.join-party-label {
+  font-size: 0.8rem;
+  color: var(--light-gray);
+}
+
+.join-party-input-group {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.join-party-input {
+  width: 80%;
+}
