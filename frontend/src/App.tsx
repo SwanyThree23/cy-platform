@@ -645,12 +645,159 @@ const StreamView: React.FC<{
 };
 
 // ============================================
+// WATCH PARTY ROOM COMPONENT (Synchronized)
+// ============================================
+
+const WatchPartyRoom: React.FC<{
+  partyId: string;
+  userId: string;
+  isHost: boolean;
+  socket: Socket | null;
+  onLeave: () => void;
+}> = ({ partyId, userId, isHost, socket, onLeave }) => {
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [participants, setParticipants] = useState<{userId: string, isReady: boolean}[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isReady, setIsReady] = useState(false);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    socket.on('watch-party-joined', ({ playback, participants }) => {
+      setIsPlaying(playback.isPlaying);
+      setCurrentTime(playback.currentTime);
+      setParticipants(participants);
+    });
+
+    socket.on('participant-joined', ({ userId }) => {
+      setParticipants(prev => [...prev, { userId, isReady: false }]);
+    });
+
+    socket.on('playback-updated', ({ currentTime, isPlaying }) => {
+      setCurrentTime(currentTime);
+      setIsPlaying(isPlaying);
+    });
+
+    socket.on('participant-ready-change', ({ userId: rUserId, isReady }) => {
+      setParticipants(prev => prev.map(p => p.userId === rUserId ? { ...p, isReady } : p));
+    });
+
+    socket.on('ai-response', (msg) => {
+      setChatMessages(prev => [...prev, msg]);
+    });
+
+    socket.emit('join-watch-party', { partyId, userId });
+
+    return () => {
+      socket.off('watch-party-joined');
+      socket.off('participant-joined');
+      socket.off('playback-updated');
+      socket.off('participant-ready-change');
+      socket.off('ai-response');
+    };
+  }, [socket, partyId, userId]);
+
+  const toggleReady = () => {
+    const newReady = !isReady;
+    setIsReady(newReady);
+    socket?.emit('watch-party-ready-status', { partyId, userId, isReady: newReady });
+  };
+
+  const syncPlayback = (newTime: number, playing: boolean) => {
+    socket?.emit('watch-party-sync-playback', { partyId, currentTime: newTime, isPlaying: playing });
+  };
+
+  const handleAskAI = (prompt: string) => {
+    socket?.emit('ask-party-ai', { partyId, prompt, userId, username: 'User', model: 'anthropic/claude-3.5-sonnet' });
+  };
+
+  return (
+    <div className="watch-party-view">
+      <div className="watch-party-main">
+        <div className="video-container gold-border">
+          <div className="video-placeholder">
+            <span className="live-indicator">SYNCHRONIZED PLAYBACK</span>
+            <p>Video ID: {partyId} • {isPlaying ? 'Playing' : 'Paused'} • {Math.floor(currentTime)}s</p>
+          </div>
+        </div>
+
+        <div className="ready-panel">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3>Participants Ready Status</h3>
+            <button 
+              className={`ready-btn ${isReady ? 'active' : ''}`}
+              onClick={toggleReady}
+            >
+              {isReady ? 'I am Ready!' : 'Set Ready'}
+            </button>
+          </div>
+          
+          <div className="participant-list">
+            {participants.map(p => (
+              <div key={p.userId} className={`participant-badge ${p.isReady ? 'ready' : ''}`}>
+                <div className="ready-indicator"></div>
+                <span>{p.userId === userId ? 'You' : p.userId}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="invite-section">
+          <div>
+            <span style={{ color: 'var(--light-gray)', fontSize: '0.8rem' }}>Share Invite Code</span>
+            <div className="invite-code">{partyId.toUpperCase()}</div>
+          </div>
+          <button className="payment-btn" style={{ background: 'var(--gold-dark)' }} onClick={() => onLeave()}>
+            Leave Party
+          </button>
+        </div>
+      </div>
+
+      <div className="stream-sidebar">
+        <div className="chat-panel">
+          <div className="chat-header">
+            <h3>Watch Party Chat</h3>
+            <div className="ai-assistant-badge">AI ASSISTANT READY</div>
+          </div>
+          <div className="chat-messages">
+            {chatMessages.map((m, i) => (
+              <div key={i} className={`chat-message ${m.userId === 'swani-ai' ? 'ai' : ''}`}>
+                <span className="chat-username">{m.username}</span>
+                <p className="chat-text">{m.message}</p>
+              </div>
+            ))}
+            {chatMessages.length === 0 && (
+              <div className="chat-notice">Ask SWANI AI for info about the video!</div>
+            )}
+          </div>
+          <div className="chat-input-form">
+            <input 
+              type="text" 
+              className="chat-input" 
+              placeholder="Ask SWANI AI or type message..."
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  handleAskAI((e.target as HTMLInputElement).value);
+                  (e.target as HTMLInputElement).value = '';
+                }
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
 // MAIN APP COMPONENT
 // ============================================
 
 const App: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
+  const [activePartyId, setActivePartyId] = useState<string | null>(null);
   const [isHost, setIsHost] = useState(false);
   const [userId] = useState(() => `user-${Math.random().toString(36).substr(2, 9)}`);
 
@@ -663,10 +810,6 @@ const App: React.FC = () => {
       console.log('[Socket] Connected:', newSocket.id);
     });
 
-    newSocket.on('disconnect', () => {
-      console.log('[Socket] Disconnected');
-    });
-
     setSocket(newSocket);
 
     return () => {
@@ -676,50 +819,92 @@ const App: React.FC = () => {
 
   const handleJoinStream = (streamId: string) => {
     setActiveStreamId(streamId);
+    setActivePartyId(null);
     setIsHost(false);
   };
 
-  const handleHostStream = (streamId: string) => {
-    setActiveStreamId(streamId);
+  const handleJoinParty = (partyId: string) => {
+    setActivePartyId(partyId);
+    setActiveStreamId(null);
+    setIsHost(false);
+  };
+
+  const handleCreateParty = () => {
+    const newId = `party-${Math.random().toString(36).substr(2, 6)}`;
+    setActivePartyId(newId);
+    setActiveStreamId(null);
     setIsHost(true);
   };
 
   return (
     <div className="app">
-      {!activeStreamId ? (
+      {!activeStreamId && !activePartyId ? (
         <div className="home-view">
           <header className="app-header">
             <h1 className="app-logo">CY Platform</h1>
-            <p className="app-tagline">Zero-Fee Live Streaming • 20-Guest Panels • Cross-Platform</p>
+            <p className="app-tagline">Zero-Fee Live Streaming • 20-Guest Panels • AI Watch Parties</p>
           </header>
 
           <div className="stream-browser">
-            <h2>Live Streams</h2>
-            {/* Stream list would be fetched from API */}
-            <div className="stream-list">
-              <div className="stream-card" onClick={() => handleJoinStream('demo-stream-1')}>
-                <div className="stream-thumbnail">
-                  <span className="live-badge">LIVE</span>
+            <div className="main-sections">
+              <section>
+                <h2>Live Streams</h2>
+                <div className="stream-list">
+                  <div className="stream-card" onClick={() => handleJoinStream('demo-stream-1')}>
+                    <div className="stream-thumbnail">
+                      <span className="live-badge">LIVE</span>
+                    </div>
+                    <div className="stream-details">
+                      <h3>Gold Board Auction</h3>
+                      <p>Featured Stream • 2.4k viewers</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="stream-details">
-                  <h3>Demo Stream</h3>
-                  <p>Click to join as viewer</p>
+              </section>
+
+              <section style={{ marginTop: '2rem' }}>
+                <h2>Watch Parties</h2>
+                <div className="stream-list">
+                  <div className="stream-card" style={{ borderLeft: '4px solid var(--accent)' }} onClick={() => handleJoinParty('party-demo')}>
+                    <div className="stream-thumbnail" style={{ background: 'var(--dark-gray)' }}>
+                      <span className="live-badge" style={{ background: var(--accent) }}>WATCH PARTY</span>
+                    </div>
+                    <div className="stream-details">
+                      <h3>Movie Night with Fans</h3>
+                      <p>Join synchronized playback</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </section>
             </div>
 
             <div className="host-section">
-              <h2>Start Streaming</h2>
+              <h2>Creator Tools</h2>
               <button 
                 className="host-btn"
-                onClick={() => handleHostStream('new-stream')}
+                onClick={() => handleJoinStream('host-stream')}
               >
                 Go Live
               </button>
+              <button 
+                className="host-btn"
+                style={{ marginTop: '1rem', background: 'var(--medium-gray)', color: 'var(--gold-primary)', border: '1px solid var(--gold-dark)' }}
+                onClick={handleCreateParty}
+              >
+                Start Watch Party
+              </button>
+              
+              <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--black)', borderRadius: '8px' }}>
+                <p style={{ fontSize: '0.8rem', color: var(--light-gray) }}>Join by Invite Code</p>
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <input type="text" placeholder="CODE" className="chat-input" style={{ width: '80%' }} />
+                  <button className="chat-send-btn">➔</button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      ) : (
+      ) : (activeStreamId ? (
         socket && (
           <StreamView
             streamId={activeStreamId}
@@ -728,7 +913,17 @@ const App: React.FC = () => {
             socket={socket}
           />
         )
-      )}
+      ) : (
+        socket && (
+          <WatchPartyRoom
+            partyId={activePartyId!}
+            userId={userId}
+            isHost={isHost}
+            socket={socket}
+            onLeave={() => setActivePartyId(null)}
+          />
+        )
+      ))}
     </div>
   );
 };
