@@ -1639,13 +1639,78 @@ io.on("connection", (socket) => {
     socket.to(streamId).emit("guest-removed", { guestId });
   });
 
-  // Watch party sync
+  // Watch party sync (Basic)
   socket.on("sync-watch-party", ({ streamId, timestamp, isPlaying }) => {
     socket.to(streamId).emit("watch-party-sync", {
       timestamp,
       isPlaying,
       senderId: socket.id,
     });
+  });
+
+  // Watch Party v2 (Advanced)
+  socket.on("join-watch-party", async ({ partyId, userId }) => {
+    try {
+      socket.join(`party:${partyId}`);
+      const party = await watchPartyManager.joinParty(partyId, userId, socket.id);
+      
+      socket.emit("watch-party-joined", {
+        partyId,
+        playback: party.playback,
+        participants: Array.from(party.participants.entries()).map(([uId, p]) => ({
+          userId: uId,
+          isReady: p.isReady,
+          status: p.status,
+        })),
+      });
+
+      socket.to(`party:${partyId}`).emit("participant-joined", {
+        userId,
+        timestamp: new Date().toISOString(),
+      });
+
+      console.log(`[Socket] User ${userId} joined watch party ${partyId}`);
+    } catch (error) {
+      console.error("[Socket] Error joining watch party:", error);
+      socket.emit("error", { message: error.message });
+    }
+  });
+
+  socket.on("watch-party-sync-playback", ({ partyId, currentTime, isPlaying }) => {
+    watchPartyManager.updatePlayback(partyId, currentTime, isPlaying);
+    socket.to(`party:${partyId}`).emit("playback-updated", {
+      currentTime,
+      isPlaying,
+      senderId: socket.id,
+    });
+  });
+
+  socket.on("watch-party-ready-status", async ({ partyId, userId, isReady }) => {
+    await watchPartyManager.setReadyStatus(partyId, userId, isReady);
+    io.to(`party:${partyId}`).emit("participant-ready-change", {
+      userId,
+      isReady,
+    });
+  });
+
+  // AI Assistance in Watch Party
+  socket.on("ask-party-ai", async ({ partyId, prompt, userId, username, model }) => {
+    try {
+      // Get context (last messages or current video info)
+      const context = { partyId, triggerUser: username };
+      
+      const aiResponse = await swaniAI.askAI(prompt, context, model);
+      
+      io.to(`party:${partyId}`).emit("ai-response", {
+        message: aiResponse,
+        model: model || "default",
+        userId: "swani-ai",
+        username: "SWANI AI",
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error("[Socket] AI error in watch party:", error);
+    }
   });
 
   // Payment notification (for live display)
