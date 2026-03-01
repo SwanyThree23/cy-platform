@@ -18,7 +18,7 @@ dotenv.config();
 // CONSTANTS & CONFIGURATION
 // ============================================
 
-const PORT = process.env.PORT || 3001;
+const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.HOST || "0.0.0.0";
 const NODE_ENV = process.env.NODE_ENV || "development";
 
@@ -159,7 +159,7 @@ class MediasoupManager extends EventEmitter {
     console.log(`[Mediasoup] Initializing ${numWorkers} workers...`);
 
     for (let i = 0; i < numWorkers; i++) {
-      const worker = await mediasoup.createWorker(MEDIASOUP_CONFIG.worker);
+      const worker = await mediasoup.createWorker(MEDIASOUP_CONFIG.worker as mediasoup.types.WorkerSettings);
 
       worker.on("died", () => {
         console.error(`[Mediasoup] Worker ${i} died, restarting...`);
@@ -173,7 +173,7 @@ class MediasoupManager extends EventEmitter {
   }
 
   private async restartWorker(index: number) {
-    const worker = await mediasoup.createWorker(MEDIASOUP_CONFIG.worker);
+    const worker = await mediasoup.createWorker(MEDIASOUP_CONFIG.worker as mediasoup.types.WorkerSettings);
     this.workers[index] = worker;
     console.log(`[Mediasoup] Worker ${index} restarted`);
   }
@@ -462,7 +462,7 @@ class RTMPFanOutManager extends EventEmitter {
       let decrypted = decipher.update(encryptedKey, "hex", "utf8");
       decrypted += decipher.final("utf8");
       return decrypted;
-    } catch (error) {
+    } catch (error: any) {
       console.error("[RTMP] Failed to decrypt stream key:", error);
       return "";
     }
@@ -624,7 +624,7 @@ Be strict but fair. Allow casual conversation and mild profanity. Delete only se
         confidence: result.confidence || 0.5,
         reason: result.reason,
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error("[SwaniAI] Moderation error:", error);
       return {
         action: "allow",
@@ -669,7 +669,7 @@ Be strict but fair. Allow casual conversation and mild profanity. Delete only se
       if (!response.ok) throw new Error(`API error: ${response.status}`);
       const data = await response.json();
       return data.choices[0]?.message?.content || "";
-    } catch (error) {
+    } catch (error: any) {
       console.error("[SwaniAI] AI Ask error:", error);
       return "I am sorry, I am having trouble connecting to my brain right now.";
     }
@@ -706,7 +706,7 @@ Be strict but fair. Allow casual conversation and mild profanity. Delete only se
         data.choices[0]?.message?.content ||
         message.substring(0, maxLength) + "..."
       );
-    } catch (error) {
+    } catch (error: any) {
       return message.substring(0, maxLength) + "...";
     }
   }
@@ -1091,7 +1091,7 @@ app.get("/api/streams/:streamId/rtp-capabilities", async (req, res) => {
     res.json({
       rtpCapabilities: router.rtpCapabilities,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error getting RTP capabilities:", error);
     res.status(500).json({ error: "Failed to get RTP capabilities" });
   }
@@ -1114,7 +1114,7 @@ app.post("/api/streams/:streamId/transport", async (req, res) => {
       iceCandidates: transport.iceCandidates,
       dtlsParameters: transport.dtlsParameters,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating transport:", error);
     res.status(500).json({ error: "Failed to create transport" });
   }
@@ -1137,7 +1137,7 @@ app.post(
 
       await transport.connect({ dtlsParameters });
       res.json({ connected: true });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error connecting transport:", error);
       res.status(500).json({ error: "Failed to connect transport" });
     }
@@ -1161,7 +1161,7 @@ app.post(
       res.json({
         producerId: producer.id,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error producing:", error);
       res.status(500).json({ error: "Failed to produce" });
     }
@@ -1192,7 +1192,7 @@ app.post(
         kind: consumer.kind,
         rtpParameters: consumer.rtpParameters,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error consuming:", error);
       res.status(500).json({ error: "Failed to consume" });
     }
@@ -1225,7 +1225,7 @@ app.get("/api/streams", async (req, res) => {
     }
 
     res.json(data);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching streams:", error);
     res.status(500).json({ error: "Failed to fetch streams" });
   }
@@ -1249,7 +1249,7 @@ app.get("/api/streams/:streamId", async (req, res) => {
     }
 
     res.json(data);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching stream:", error);
     res.status(500).json({ error: "Failed to fetch stream" });
   }
@@ -1262,7 +1262,7 @@ app.post("/api/streams", async (req, res) => {
 
     const stream = await streamManager.createStream(hostId, streamData);
     res.status(201).json(stream);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating stream:", error);
     res.status(500).json({ error: "Failed to create stream" });
   }
@@ -1276,7 +1276,7 @@ app.post("/api/streams/:streamId/go-live", async (req, res) => {
 
     const stream = await streamManager.goLive(streamId, platforms);
     res.json(stream);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error going live:", error);
     res.status(500).json({ error: "Failed to start stream" });
   }
@@ -1289,7 +1289,7 @@ app.post("/api/streams/:streamId/end", async (req, res) => {
 
     await streamManager.endStream(streamId);
     res.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error ending stream:", error);
     res.status(500).json({ error: "Failed to end stream" });
   }
@@ -1324,7 +1324,7 @@ app.get("/api/users/:userId/payment-handles", async (req, res) => {
       displayName: data.display_name,
       handles,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching payment handles:", error);
     res.status(500).json({ error: "Failed to fetch payment handles" });
   }
@@ -1354,7 +1354,7 @@ app.put("/api/users/:userId/payment-handles", async (req, res) => {
     }
 
     res.json(data);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating payment handles:", error);
     res.status(500).json({ error: "Failed to update payment handles" });
   }
@@ -1385,7 +1385,7 @@ app.put("/api/users/:userId/stream-keys", async (req, res) => {
     }
 
     res.json({ success: true });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating stream key:", error);
     res.status(500).json({ error: "Failed to update stream key" });
   }
@@ -1422,7 +1422,7 @@ io.on("connection", (socket) => {
       });
 
       console.log(`[Socket] ${socket.id} joined stream: ${streamId}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("[Socket] Error joining stream:", error);
       socket.emit("error", { message: "Failed to join stream" });
     }
@@ -1440,7 +1440,7 @@ io.on("connection", (socket) => {
       });
 
       console.log(`[Socket] ${socket.id} left stream: ${streamId}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("[Socket] Error leaving stream:", error);
     }
   });
@@ -1459,7 +1459,7 @@ io.on("connection", (socket) => {
 
         await transport.connect({ dtlsParameters });
         callback({ success: true });
-      } catch (error) {
+      } catch (error: any) {
         console.error("[Socket] Error connecting transport:", error);
         callback({ error: error.message });
       }
@@ -1485,7 +1485,7 @@ io.on("connection", (socket) => {
           kind,
           socketId: socket.id,
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error("[Socket] Error producing:", error);
         callback({ error: error.message });
       }
@@ -1516,7 +1516,7 @@ io.on("connection", (socket) => {
           kind: consumer.kind,
           rtpParameters: consumer.rtpParameters,
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error("[Socket] Error consuming:", error);
         callback({ error: error.message });
       }
@@ -1576,7 +1576,7 @@ io.on("connection", (socket) => {
           `[Moderation] Flagged message in stream ${streamId}: ${message.substring(0, 50)}...`,
         );
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("[Socket] Error handling chat message:", error);
       socket.emit("error", { message: "Failed to send message" });
     }
@@ -1606,7 +1606,7 @@ io.on("connection", (socket) => {
       console.log(
         `[Socket] Guest ${userId} joined panel at position ${gridPosition} in stream ${streamId}`,
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error("[Socket] Error joining as guest:", error);
       socket.emit("error", { message: error.message });
     }
@@ -1621,7 +1621,7 @@ io.on("connection", (socket) => {
       });
 
       console.log(`[Socket] Guest ${guestId} left panel in stream ${streamId}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error("[Socket] Error leaving as guest:", error);
     }
   });
@@ -1708,7 +1708,7 @@ io.on("connection", (socket) => {
         username: "SWANI AI",
         timestamp: new Date().toISOString(),
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error("[Socket] AI error in watch party:", error);
     }
   });
@@ -1757,7 +1757,7 @@ async function startServer() {
 ╚════════════════════════════════════════════════════════════╝
       `);
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Failed to start server:", error);
     process.exit(1);
   }
