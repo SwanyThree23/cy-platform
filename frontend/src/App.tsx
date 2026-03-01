@@ -867,7 +867,7 @@ const App: React.FC = () => {
                 <div className="stream-list">
                   <div className="stream-card" style={{ borderLeft: '4px solid var(--accent)' }} onClick={() => handleJoinParty('party-demo')}>
                     <div className="stream-thumbnail" style={{ background: 'var(--dark-gray)' }}>
-                      <span className="live-badge" style={{ background: var(--accent) }}>WATCH PARTY</span>
+                      <span className="live-badge" style={{ background: 'var(--accent)' }}>WATCH PARTY</span>
                     </div>
                     <div className="stream-details">
                       <h3>Movie Night with Fans</h3>
@@ -895,7 +895,7 @@ const App: React.FC = () => {
               </button>
               
               <div style={{ marginTop: '1.5rem', padding: '1rem', background: 'var(--black)', borderRadius: '8px' }}>
-                <p style={{ fontSize: '0.8rem', color: var(--light-gray) }}>Join by Invite Code</p>
+                <p style={{ fontSize: '0.8rem', color: 'var(--light-gray)' }}>Join by Invite Code</p>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
                   <input type="text" placeholder="CODE" className="chat-input" style={{ width: '80%' }} />
                   <button className="chat-send-btn">➔</button>
