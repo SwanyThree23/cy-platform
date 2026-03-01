@@ -395,7 +395,7 @@ SELECT
 FROM streams s
 JOIN users u ON s.host_id = u.id
 LEFT JOIN categories c ON s.category_id = c.id
-WHERE s.status = 'live' AND s.is_active = TRUE;
+WHERE s.status = 'live' AND u.is_active = TRUE;
 
 -- Creator revenue summary view
 CREATE VIEW creator_revenue_summary AS
