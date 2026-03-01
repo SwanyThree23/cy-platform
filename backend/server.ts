@@ -553,10 +553,6 @@ class RTMPFanOutManager extends EventEmitter {
 const rtmpManager = new RTMPFanOutManager();
 
 // ============================================
-// SWANI AI WRAPPER
-// ============================================
-
-// ============================================
 // SWANI AI WRAPPER (Enhanced)
 // ============================================
 
