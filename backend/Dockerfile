@@ -2,6 +2,9 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Install build tools required by mediasoup
+RUN apk add --no-cache python3 py3-pip make g++ linux-headers bash
+
 # Install dependencies
 COPY package*.json ./
 RUN npm install --legacy-peer-deps
