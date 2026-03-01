@@ -243,8 +243,8 @@ class MediasoupManager extends events_1.EventEmitter {
         if (!producer) {
             return null;
         }
-        if (!transport.router.rtpCapabilities ||
-            !transport.router.canConsume({ producerId, rtpCapabilities })) {
+        if (!transport.router?.rtpCapabilities ||
+            !transport.router?.canConsume({ producerId, rtpCapabilities })) {
             console.error(`[Mediasoup] Cannot consume ${producerId}`);
             return null;
         }
