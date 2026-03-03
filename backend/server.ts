@@ -12,6 +12,8 @@ import * as crypto from "node:crypto";
 import dotenv from "dotenv";
 import prisma from "./prisma";
 import { authMiddleware, requireAuth } from "./auth";
+import Stripe from "stripe";
+import Mux from "@mux/mux-node";
 
 dotenv.config();
 
@@ -23,9 +25,15 @@ const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.HOST || "0.0.0.0";
 const NODE_ENV = process.env.NODE_ENV || "development";
 
-// Encryption Key for Stream Credentials
-const ENCRYPTION_KEY =
-  process.env.STREAM_ENCRYPTION_KEY || crypto.randomBytes(32).toString("hex");
+// SDK Initializations
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_placeholder", {
+  apiVersion: "2023-10-16" as any,
+});
+
+const mux = new Mux({
+  tokenId: process.env.MUX_TOKEN_ID || "placeholder",
+  tokenSecret: process.env.MUX_TOKEN_SECRET || "placeholder",
+});
 
 // Mediasoup Configuration
 const MEDIASOUP_CONFIG = {
@@ -1430,16 +1438,41 @@ app.put("/api/users/:userId/stream-keys", async (req, res) => {
 // Stripe Connect - Create Account Link
 app.post("/api/creators/onboard", requireAuth, async (req: any, res: any) => {
   try {
-    const creatorId = req.creator.id;
+    const creator = req.creator;
     
-    // In a real app, use stripe.accounts.create({...})
-    // and stripe.accountLinks.create({...})
+    // Create connect account if not exists
+    let stripeAccountId = creator.stripeAccountId;
+    
+    if (!stripeAccountId) {
+      const account = await stripe.accounts.create({
+        type: "express",
+        email: creator.email,
+        capabilities: {
+          card_payments: { requested: true },
+          transfers: { requested: true },
+        },
+      });
+      
+      stripeAccountId = account.id;
+      await prisma.creator.update({
+        where: { id: creator.id },
+        data: { stripeAccountId },
+      });
+    }
+
+    const accountLink = await stripe.accountLinks.create({
+      account: stripeAccountId,
+      refresh_url: `${process.env.FRONTEND_URL}/dashboard?onboarding=refresh`,
+      return_url: `${process.env.FRONTEND_URL}/dashboard?onboarding=complete`,
+      type: "account_onboarding",
+    });
     
     res.json({
-      url: "https://connect.stripe.com/express/demo",
+      url: accountLink.url,
       success: true
     });
   } catch (error: any) {
+    console.error("[Stripe] Onboarding Error:", error);
     res.status(500).json({ error: "Failed to create Stripe onboarding link" });
   }
 });
@@ -1447,14 +1480,64 @@ app.post("/api/creators/onboard", requireAuth, async (req: any, res: any) => {
 // Mux - Create Asset/Upload URL
 app.post("/api/creators/upload-url", requireAuth, async (req: any, res: any) => {
   try {
-    // In a real app, use Mux.Video.Uploads.create({...})
+    const upload = await mux.video.uploads.create({
+      cors_origin: "*",
+      new_asset_settings: {
+        playback_policy: ["public"],
+      },
+    });
     
     res.json({
-      uploadUrl: "https://mux-demo-upload.com/session-123",
-      id: "mux-asset-mock-123"
+      uploadUrl: upload.url,
+      id: upload.id
     });
   } catch (error: any) {
+    console.error("[Mux] Upload Error:", error);
     res.status(500).json({ error: "Failed to create Mux upload URL" });
+  }
+});
+
+// Marketplace Checkout Session
+app.post("/api/marketplace/create-checkout", requireAuth, async (req: any, res: any) => {
+  try {
+    const { videoPostId } = req.body;
+    const post = await prisma.videoPost.findUnique({
+      where: { id: videoPostId },
+      include: { creator: true }
+    });
+
+    if (!post || !post.creator.stripeAccountId) {
+      return res.status(404).json({ error: "Post or Creator not found" });
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ["card"],
+      line_items: [{
+        price_data: {
+          currency: "usd",
+          product_data: {
+            name: post.title,
+            description: post.description || undefined,
+          },
+          unit_amount: Math.round(Number(post.price) * 100),
+        },
+        quantity: 1,
+      }],
+      mode: "payment",
+      success_url: `${process.env.FRONTEND_URL}/marketplace?purchase_success=true&id=${post.id}`,
+      cancel_url: `${process.env.FRONTEND_URL}/marketplace?purchase_cancel=true`,
+      payment_intent_data: {
+        application_fee_amount: 0, // Zero fee platform
+        transfer_data: {
+          destination: post.creator.stripeAccountId,
+        },
+      },
+    });
+
+    res.json({ id: session.id, url: session.url });
+  } catch (error: any) {
+    console.error("[Stripe] Checkout Error:", error);
+    res.status(500).json({ error: "Failed to create checkout session" });
   }
 });
 

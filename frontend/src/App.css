@@ -351,8 +351,238 @@ h2 {
   text-shadow: none !important;
 }
 
-@keyframes pulse-live {
-  0% { opacity: 1; }
-  50% { opacity: 0.5; }
-  100% { opacity: 1; }
+
+/* ============================================ */
+/* NEW AUTH & HEADER STYLES                  */
+/* ============================================ */
+
+.header-brand {
+  display: flex;
+  flex-direction: column;
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.nav-btn {
+  background: none;
+  border: 1px solid var(--accent-noise);
+  color: var(--signal-med);
+  padding: 0.6rem 1rem;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nav-btn:hover {
+  border-color: var(--signal-high);
+  color: var(--signal-high);
+  background-color: var(--obsidian-layer-2);
+}
+
+.auth-btn {
+  background-color: var(--signal-high);
+  color: var(--obsidian-base);
+  border: none;
+  padding: 0.6rem 1.2rem;
+  font-family: var(--font-mono);
+  font-weight: bold;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+}
+
+.auth-btn:hover {
+  background-color: var(--signal-med);
+}
+
+.icon-gold { color: #DAA520; }
+.icon-red { color: var(--accent-live); }
+
+/* ============================================ */
+/* DASHBOARD VIEW STYLES                      */
+/* ============================================ */
+
+.dashboard-view {
+  min-height: 100vh;
+  background-color: var(--obsidian-base);
+  display: flex;
+  flex-direction: column;
+}
+
+.dashboard-content {
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.dashboard-panel {
+  background-color: var(--obsidian-layer-1);
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.dashboard-panel.full-width {
+  grid-column: span 2;
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid var(--accent-noise);
+  padding-bottom: 1rem;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+}
+
+.revenue-stats {
+  display: flex;
+  gap: 2rem;
+}
+
+.big-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.big-stat .stat-label {
+  font-size: 0.7rem;
+  color: var(--signal-low);
+}
+
+.big-stat .stat-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.stripe-btn {
+  background-color: #635bff !important; /* Stripe Purple */
+  border: none !important;
+  margin-top: 1rem;
+}
+
+.setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.setting-item label {
+  font-size: 0.7rem;
+  color: var(--signal-med);
+}
+
+.input-copy-group {
+  display: flex;
+}
+
+.copy-btn {
+  background-color: var(--obsidian-layer-2);
+  border: 1px solid var(--accent-noise);
+  border-left: none;
+  color: var(--signal-med);
+  padding: 0 1rem;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.security-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.65rem;
+  color: var(--signal-low);
+}
+
+.fan-metrics {
+  display: flex;
+  justify-content: space-around;
+  padding: 1rem 0;
+}
+
+.fan-stat {
+  text-align: center;
+}
+
+.fan-stat h3 {
+  font-size: 2rem;
+  margin: 0;
+}
+
+.fan-stat p {
+  font-size: 0.7rem;
+  color: var(--signal-low);
+  margin: 0.5rem 0 0 0;
+}
+
+/* Marketplace Enhancements */
+.header-title-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.price-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.price-input-wrapper svg {
+  position: absolute;
+  left: 10px;
+  color: var(--signal-low);
+}
+
+.price-input-wrapper .chat-input {
+  padding-left: 2.5rem;
+}
+
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 400px;
+  gap: 1rem;
+  grid-column: span 3;
+}
+
+.signal-pulse {
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--signal-high);
+  border-radius: 50%;
+  animation: signal-expand 1.5s infinite ease-out;
+}
+
+@keyframes signal-expand {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+.loading-spinner {
+  letter-spacing: 0.2em;
+  animation: pulse-live 1s infinite;
 }

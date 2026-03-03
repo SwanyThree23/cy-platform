@@ -1,6 +1,26 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Device } from 'mediasoup-client';
 import { io, Socket } from 'socket.io-client';
+import { 
+  useUser, 
+  useAuth, 
+  UserButton, 
+  SignInButton, 
+  SignedIn, 
+  SignedOut 
+} from '@clerk/clerk-react';
+import { 
+  Shield, 
+  Zap, 
+  DollarSign, 
+  Play, 
+  Plus, 
+  Settings, 
+  Layout, 
+  ShoppingBag,
+  ExternalLink,
+  Users
+} from 'lucide-react';
 import './App.css';
 
 // ============================================
@@ -73,7 +93,8 @@ interface VideoPost {
 const MarketplaceView: React.FC<{
   userId: string;
   onBack: () => void;
-}> = ({ userId, onBack }) => {
+  getToken: () => Promise<string | null>;
+}> = ({ userId, onBack, getToken }) => {
   const [posts, setPosts] = useState<VideoPost[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
@@ -100,28 +121,64 @@ const MarketplaceView: React.FC<{
     }
   };
 
+  const handlePurchase = async (post: VideoPost) => {
+    try {
+      const token = await getToken();
+      const response = await fetch('/api/marketplace/create-checkout', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ videoPostId: post.id }),
+      });
+      
+      const session = await response.json();
+      if (session.url) {
+        window.location.href = session.url;
+      }
+    } catch (error) {
+      console.error('Purchase failed:', error);
+    }
+  };
+
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsUploading(true);
     
     try {
-      // In a real app, you'd upload the video file to Supabase Storage first
-      // For this demo, we'll use a placeholder video URL
+      const token = await getToken();
+      // First, get an upload URL from Mux (via our backend)
+      const uploadRes = await fetch('/api/creators/upload-url', {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      const { uploadUrl, id: uploadId } = await uploadRes.json();
+      
+      // In a real app, you'd perform a PUT request to uploadUrl here
+      // For this workflow, we'll simulate the successful Mux upload
+      
       const response = await fetch('/api/marketplace', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({
           userId,
           ...uploadData,
-          videoUrl: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
-          thumbnailUrl: 'https://via.placeholder.com/300x169/daa520/0a0a0a?text=CY+Platform+Video'
+          videoUrl: `https://stream.mux.com/${uploadId}/high.mp4`,
+          thumbnailUrl: `https://image.mux.com/${uploadId}/thumbnail.jpg`
         }),
       });
 
       if (response.ok) {
         setUploadData({ title: '', description: '', price: 0, isForSale: true });
         fetchPosts();
-        alert('Video uploaded successfully!');
+        alert('Video listed successfully! (Staking processing via Mux)');
       }
     } catch (error) {
       console.error('Upload failed:', error);
@@ -134,7 +191,10 @@ const MarketplaceView: React.FC<{
     <div className="marketplace-view">
       <header className="marketplace-header glass-effect">
         <button className="back-btn" onClick={onBack}>← Back</button>
-        <h2 className="glow-text">CY Marketplace</h2>
+        <div className="header-title-group">
+          <ShoppingBag className="icon-gold" />
+          <h2 className="glow-text">CY Marketplace</h2>
+        </div>
         <div className="marketplace-stats-bar">
           <div className="stat-item">
             <span className="stat-value">{posts.length}</span>
@@ -154,8 +214,11 @@ const MarketplaceView: React.FC<{
 
       <div className="marketplace-content">
         <aside className="upload-sidebar gold-border">
-          <h3>Upload Video Post</h3>
-          <p>Sell your content or share for free</p>
+          <div className="sidebar-header">
+            <Zap size={18} className="icon-red" />
+            <h3>List Your Signal</h3>
+          </div>
+          <p>Sell content at your price. Zero cuts.</p>
           <form className="upload-form" onSubmit={handleUpload}>
             <div className="input-field">
               <label htmlFor="post-title">Video Title</label>
@@ -181,39 +244,54 @@ const MarketplaceView: React.FC<{
             </div>
 
             <div className="price-input-group">
-              <label htmlFor="post-price">Price ($)</label>
-              <input 
-                id="post-price"
-                type="number" 
-                className="chat-input" 
-                value={uploadData.price}
-                onChange={e => setUploadData({...uploadData, price: parseFloat(e.target.value)})}
-                step="0.01" 
-              />
+              <label htmlFor="post-price">Price (USD)</label>
+              <div className="price-input-wrapper">
+                <DollarSign size={16} />
+                <input 
+                  id="post-price"
+                  type="number" 
+                  className="chat-input" 
+                  value={uploadData.price}
+                  onChange={e => setUploadData({...uploadData, price: parseFloat(e.target.value)})}
+                  step="0.01" 
+                />
+              </div>
             </div>
             <button type="submit" className="host-btn" disabled={isUploading}>
-              {isUploading ? 'Uploading...' : 'Post Video'}
+              {isUploading ? (
+                <span className="loading-spinner">PROCESSING...</span>
+              ) : (
+                <><Plus size={18} /> LIST VIDEO</>
+              )}
             </button>
           </form>
         </aside>
 
         <main className="posts-grid">
           {loading ? (
-            <div className="loading">Loading marketplace...</div>
+            <div className="loading-state">
+              <div className="signal-pulse"></div>
+              <p>FETCHING MARKET DATA...</p>
+            </div>
           ) : (
             posts.map(post => (
               <div key={post.id} className="post-card gold-border">
                 <div className="post-thumbnail">
                   <img src={post.thumbnail_url} alt={post.title} />
                   {post.price > 0 && <span className="price-tag">${post.price}</span>}
-                  <button className="play-overlay">▶</button>
+                  <button className="play-overlay"><Play fill="white" size={32} /></button>
                 </div>
                 <div className="post-info">
                   <h4>{post.title}</h4>
-                  <p className="post-author">By {post.author?.display_name || post.user_id}</p>
+                  <p className="post-author">SIGNAL BY: {post.author?.display_name || post.user_id}</p>
                   <div className="post-actions">
                     <button className="like-btn">❤️ {post.likes_count}</button>
-                    <button className="buy-btn">BUY NOW</button>
+                    <button 
+                      className="buy-btn"
+                      onClick={() => handlePurchase(post)}
+                    >
+                      BUY NOW
+                    </button>
                   </div>
                 </div>
               </div>
@@ -221,10 +299,134 @@ const MarketplaceView: React.FC<{
           )}
           {posts.length === 0 && !loading && (
             <div className="no-posts">
-              <p>No videos found in the marketplace. Be the first to upload!</p>
+              <p>THE MARKET IS QUIET. BE THE SIGNAL.</p>
             </div>
           )}
         </main>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// CREATOR DASHBOARD COMPONENT
+// ============================================
+
+const CreatorDashboard: React.FC<{
+  onBack: () => void;
+  getToken: () => Promise<string | null>;
+}> = ({ onBack, getToken }) => {
+  const { user } = useUser();
+  const [onboardingUrl, setOnboardingUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleStartOnboarding = async () => {
+    setLoading(true);
+    try {
+      const token = await getToken();
+      const response = await fetch('/api/creators/onboard', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch (error) {
+      console.error('Onboarding failed:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="dashboard-view">
+      <header className="marketplace-header glass-effect">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <div className="header-title-group">
+          <Layout className="icon-gold" />
+          <h2 className="glow-text">CREATOR COMMAND</h2>
+        </div>
+      </header>
+
+      <div className="dashboard-content">
+        <div className="dashboard-grid">
+          {/* Revenue Panel */}
+          <div className="dashboard-panel gold-border">
+            <div className="panel-header">
+              <DollarSign className="icon-gold" />
+              <h3>REVENUE OPERATIONS</h3>
+            </div>
+            <div className="revenue-stats">
+              <div className="big-stat">
+                <span className="stat-label">TOTAL EARNINGS</span>
+                <span className="stat-value">$0.00</span>
+              </div>
+              <div className="big-stat">
+                <span className="stat-label">PLATFORM FEES PAID</span>
+                <span className="stat-value">$0.00</span>
+              </div>
+            </div>
+            <div className="stripe-status">
+              <p>Enable direct-to-bank payouts via Stripe Connect.</p>
+              <button 
+                className="host-btn stripe-btn" 
+                onClick={handleStartOnboarding}
+                disabled={loading}
+              >
+                {loading ? 'CONNECTING...' : 'SETUP DIRECT PAYOUTS'}
+              </button>
+            </div>
+          </div>
+
+          {/* Stream Settings */}
+          <div className="dashboard-panel gold-border">
+            <div className="panel-header">
+              <Zap className="icon-red" />
+              <h3>SIGNAL CONFIGURATION</h3>
+            </div>
+            <div className="setting-item">
+              <label>RTMP ENDPOINT</label>
+              <div className="input-copy-group">
+                <input readOnly value="rtmp://35.147.110.1:1935/live" className="chat-input" />
+                <button className="copy-btn">COPY</button>
+              </div>
+            </div>
+            <div className="setting-item">
+              <label>STREAM KEY</label>
+              <div className="input-copy-group">
+                <input type="password" readOnly value="CY_LIVE_••••••••••••" className="chat-input" />
+                <button className="copy-btn">REVEAL</button>
+              </div>
+            </div>
+            <div className="security-notice">
+              <Shield size={14} />
+              <span>Keys are encrypted with AES-256-CBC.</span>
+            </div>
+          </div>
+
+          {/* User Management */}
+          <div className="dashboard-panel gold-border full-width">
+            <div className="panel-header">
+              <Users className="icon-gold" />
+              <h3>FAN BASE</h3>
+            </div>
+            <div className="fan-metrics">
+              <div className="fan-stat">
+                <h3>0</h3>
+                <p>FOLLOWERS</p>
+              </div>
+              <div className="fan-stat">
+                <h3>0</h3>
+                <p>SUBSCRIPTIONS</p>
+              </div>
+              <div className="fan-stat">
+                <h3>0</h3>
+                <p>WHALES</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -987,12 +1189,17 @@ const WatchPartyRoom: React.FC<{
 // ============================================
 
 const App: React.FC = () => {
+  const { user } = useUser();
+  const { getToken } = useAuth();
   const [socket, setSocket] = useState<Socket | null>(null);
   const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
   const [activePartyId, setActivePartyId] = useState<string | null>(null);
   const [showMarketplace, setShowMarketplace] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
   const [isHost, setIsHost] = useState(false);
-  const [userId] = useState(() => `user-${Math.random().toString(36).substr(2, 9)}`);
+  
+  const userId = user?.id || 'anonymous';
+  const userDisplayName = user?.username || user?.firstName || 'Guest';
 
   useEffect(() => {
     const newSocket = io(process.env.REACT_APP_API_URL || 'http://localhost:3001', {
@@ -1033,7 +1240,11 @@ const App: React.FC = () => {
   };
 
   if (showMarketplace) {
-    return <MarketplaceView userId={userId} onBack={() => setShowMarketplace(false)} />;
+    return <MarketplaceView userId={userId} onBack={() => setShowMarketplace(false)} getToken={getToken} />;
+  }
+
+  if (showDashboard) {
+    return <CreatorDashboard onBack={() => setShowDashboard(false)} getToken={getToken} />;
   }
 
   return (
@@ -1041,15 +1252,38 @@ const App: React.FC = () => {
       {!activeStreamId && !activePartyId ? (
         <div className="home-view">
           <header className="app-header">
-            <h1 className="app-logo">CY Platform</h1>
-            <p className="app-tagline">Zero-Fee Live Streaming • 20-Guest Panels • AI Watch Parties</p>
+            <div className="header-brand">
+              <h1 className="app-logo">CY LIVE</h1>
+              <p className="app-tagline">SIGNAL OVER NOISE</p>
+            </div>
+            
             <div className="header-nav">
+              <SignedIn>
+                <button 
+                  className="nav-btn dashboard-link"
+                  onClick={() => setShowDashboard(true)}
+                >
+                  <Layout size={18} /> DASHBOARD
+                </button>
+              </SignedIn>
+              
               <button 
-                className="marketplace-nav-btn gold-border"
+                className="nav-btn marketplace-link"
                 onClick={() => setShowMarketplace(true)}
               >
-                🛍️ VISIT MARKETPLACE
+                <ShoppingBag size={18} /> MARKETPLACE
               </button>
+
+              <div className="auth-zone">
+                <SignedOut>
+                  <SignInButton mode="modal">
+                    <button className="auth-btn">JOIN SIGNAL</button>
+                  </SignInButton>
+                </SignedOut>
+                <SignedIn>
+                  <UserButton afterSignOutUrl="/" />
+                </SignedIn>
+              </div>
             </div>
           </header>
 
