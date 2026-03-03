@@ -148,19 +148,23 @@ app.use(authMiddleware); // Apply global mock auth middleware
 
 // Middleware to ensuring creator exists in DB
 const ensureCreator = async (req: any, res: any, next: any) => {
-  if (req.auth?.userId) {
+  const auth = req.auth;
+  if (auth?.userId) {
     try {
       let creator = await prisma.creator.findUnique({
-        where: { clerkId: req.auth.userId }
+        where: { clerkId: auth.userId }
       });
 
       if (!creator) {
         // Auto-provision creator
-        const handle = req.auth.email.split('@')[0].toLowerCase() + Math.floor(Math.random() * 1000);
+        // Clerk session typically includes email in sessionClaims or userEmail
+        const email = auth.sessionClaims?.email || auth.userEmail || `user_${auth.userId}@temporary.com`;
+        const handle = email.split('@')[0].toLowerCase() + Math.floor(Math.random() * 1000);
+        
         creator = await prisma.creator.create({
           data: {
-            clerkId: req.auth.userId,
-            email: req.auth.email,
+            clerkId: auth.userId,
+            email: email,
             handle: handle,
             displayName: handle.toUpperCase(),
             plan: 'FREE'

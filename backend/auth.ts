@@ -1,24 +1,32 @@
 import { Request, Response, NextFunction } from 'express';
+import { ClerkExpressWithAuth } from '@clerk/clerk-sdk-node';
 
-// Mock Clerk Authentication Middleware
-export const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
-  // In a real app, we would use clerk-sdk-node to verify the session
-  // For this mock, we'll look for user info in headers or default to a demo creator
-  const userId = req.headers['x-clerk-id'] as string || 'user_demo_123';
-  const email = req.headers['x-clerk-email'] as string || 'demo@cylive.com';
+// Setup Clerk middleware
+// Note: CLERK_SECRET_KEY must be in environment
+export const authMiddleware = ClerkExpressWithAuth({
+  // No options needed for basic session validation
+});
+
+// Helper component to check if a request is authenticated
+export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+  const auth = (req as any).auth;
   
-  // Attach user info to request
-  (req as any).auth = {
-    userId,
-    email,
-  };
+  if (!auth || !auth.userId) {
+    return res.status(401).json({ error: 'Unauthorized: No active session' });
+  }
+  
+  // Make sure we have email (Clerk session might need to sync this)
+  if (!auth.sessionClaims?.email && !auth.userEmail) {
+     // In development or if claims are missing, we might need to fetch full user
+     // but for now we'll allow it if userId exists
+  }
   
   next();
 };
 
-export const requireAuth = (req: Request, res: Response, next: NextFunction) => {
-  if (!(req as any).auth?.userId) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+// Optional: More advanced middleware to fetch full user profile from database
+// This can be used as a second layer after authMiddleware
+export const withCreatorProfile = async (req: Request, res: Response, next: NextFunction) => {
+  // Logic already exists in server.ts ensureCreator, but could be moved here
   next();
 };

@@ -344,7 +344,6 @@ h2 {
 
 .glass-effect {
   background-color: var(--obsidian-layer-1) !important;
-  backdrop-filter: none !important;
   border: 1px solid var(--accent-noise) !important;
 }
 
