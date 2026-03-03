@@ -5,12 +5,13 @@ import cors from "cors";
 import helmet from "helmet";
 import compression from "compression";
 import rateLimit from "express-rate-limit";
-import { createClient } from "@supabase/supabase-js";
 import * as mediasoup from "mediasoup";
 import ffmpeg from "fluent-ffmpeg";
 import { EventEmitter } from "events";
-import crypto from "crypto";
+import * as crypto from "node:crypto";
 import dotenv from "dotenv";
+import prisma from "./prisma";
+import { authMiddleware } from "./auth";
 
 dotenv.config();
 
@@ -117,8 +118,7 @@ const io = new Server(httpServer, {
   transports: ["websocket", "polling"],
 });
 
-// Supabase Client
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// Prisma Client (initialized in prisma.ts)
 
 // ============================================
 // MIDDLEWARE
@@ -148,6 +148,38 @@ const limiter = rateLimit({
   legacyHeaders: false,
 });
 app.use("/api/", limiter);
+app.use(authMiddleware); // Apply global mock auth middleware
+
+// Middleware to ensuring creator exists in DB
+const ensureCreator = async (req: any, res: any, next: any) => {
+  if (req.auth?.userId) {
+    try {
+      let creator = await prisma.creator.findUnique({
+        where: { clerkId: req.auth.userId }
+      });
+
+      if (!creator) {
+        // Auto-provision creator
+        const handle = req.auth.email.split('@')[0].toLowerCase() + Math.floor(Math.random() * 1000);
+        creator = await prisma.creator.create({
+          data: {
+            clerkId: req.auth.userId,
+            email: req.auth.email,
+            handle: handle,
+            displayName: handle.toUpperCase(),
+            plan: 'FREE'
+          }
+        });
+        console.log(`[Auth] Auto-provisioned creator: ${handle}`);
+      }
+      req.creator = creator;
+    } catch (error) {
+      console.error("[Auth] Error provisioning creator:", error);
+    }
+  }
+  next();
+};
+app.use(ensureCreator);
 
 // ============================================
 // MEDIASOUP SFU MANAGER

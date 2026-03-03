@@ -1148,6 +1148,89 @@ app.put("/api/users/:userId/stream-keys", async (req, res) => {
     }
 });
 // ============================================
+// MARKETPLACE ROUTES
+// ============================================
+// Get all marketplace video posts
+app.get("/api/marketplace", async (req, res) => {
+    try {
+        const { data, error } = await supabase
+            .from("video_posts")
+            .select(`
+        *,
+        author:users(username, display_name, avatar_url)
+      `)
+            .order("created_at", { ascending: false });
+        if (error)
+            throw error;
+        res.json(data);
+    }
+    catch (error) {
+        console.error("Error fetching marketplace:", error);
+        res.status(500).json({ error: "Failed to fetch marketplace" });
+    }
+});
+// Create new marketplace video post
+app.post("/api/marketplace", async (req, res) => {
+    try {
+        const { userId, title, description, videoUrl, thumbnailUrl, price, isForSale } = req.body;
+        const { data, error } = await supabase
+            .from("video_posts")
+            .insert({
+            user_id: userId,
+            title,
+            description,
+            video_url: videoUrl,
+            thumbnail_url: thumbnailUrl,
+            price,
+            is_for_sale: isForSale,
+            status: "active"
+        })
+            .select()
+            .single();
+        if (error)
+            throw error;
+        res.status(201).json(data);
+    }
+    catch (error) {
+        console.error("Error creating marketplace post:", error);
+        res.status(500).json({ error: "Failed to create marketplace post" });
+    }
+});
+// Purchase a video post
+app.post("/api/marketplace/purchase", async (req, res) => {
+    try {
+        const { videoPostId, buyerId, amount, paymentMethod, transactionId } = req.body;
+        // Get seller ID from video post
+        const { data: videoPost, error: postError } = await supabase
+            .from("video_posts")
+            .select("user_id")
+            .eq("id", videoPostId)
+            .single();
+        if (postError || !videoPost)
+            throw new Error("Video post not found");
+        const { data, error } = await supabase
+            .from("marketplace_purchases")
+            .insert({
+            video_post_id: videoPostId,
+            buyer_id: buyerId,
+            seller_id: videoPost.user_id,
+            amount,
+            payment_method: paymentMethod,
+            external_transaction_id: transactionId,
+            status: "completed"
+        })
+            .select()
+            .single();
+        if (error)
+            throw error;
+        res.status(201).json(data);
+    }
+    catch (error) {
+        console.error("Error recording purchase:", error);
+        res.status(500).json({ error: "Failed to record purchase" });
+    }
+});
+// ============================================
 // SOCKET.IO HANDLERS
 // ============================================
 io.on("connection", (socket) => {

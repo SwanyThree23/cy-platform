@@ -1,13 +1,68 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap");
+
+:root {
+  --obsidian-bg: #0a0a0a;
+  --obsidian-surface: #111111;
+  --obsidian-surface-elevated: #1a1a1a;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --signal-accent: #eaeaea; /* Subdued, professional broadcast feel */
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: var(--font-mono);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--obsidian-bg);
+  color: var(--text-primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em; /* Bold tracking */
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-weight: 600;
+  letter-spacing: 0.1em;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: var(--font-mono);
+}
+
+/* Reset gradients from previous app style */
+* {
+  box-sizing: border-box;
+}
+
+button {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border: 1px solid var(--obsidian-surface-elevated);
+  background: var(--obsidian-surface);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    border-color 0.2s;
+}
+
+button:hover {
+  background: var(--obsidian-surface-elevated);
+  border-color: var(--signal-accent);
+}
+
+input,
+textarea {
+  font-family: var(--font-mono);
+  background: var(--obsidian-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--obsidian-surface-elevated);
 }

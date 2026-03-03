@@ -1,0 +1,123 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ENUMS
+enum Category {
+  MUSIC
+  GAMING
+  TALK
+  SPORTS
+  EDUCATION
+  TECH
+  COMEDY
+  OTHER
+}
+
+enum Plan {
+  FREE
+  STUDIO_PRO
+}
+
+enum StreamStatus {
+  SCHEDULED
+  LIVE
+  ENDED
+}
+
+enum Visibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+model Creator {
+  id                  String    @id @default(uuid())
+  clerkId             String    @unique // Clark ID
+  email               String    @unique
+  handle              String    @unique // Unique @ slug
+  displayName         String?
+  avatarUrl           String?
+  bio                 String?
+  category            Category?
+  
+  // Subscription / Plan
+  plan                Plan      @default(FREE)
+  planStatus          String?
+  planPeriodEnd       DateTime?
+  subscriptionId      String?
+  
+  // Stripe Connect & Payments
+  stripeCustomerId    String?
+  stripeAccountId     String?
+  stripeAccountStatus String?
+  
+  // Streaming (Custom RTMP & Mux)
+  rtmpKey             String?   @unique
+  rtmpSecret          String?   // Unique RTMP secret
+  muxLiveStreamId     String?
+  muxStreamKey        String?
+  muxAssetId          String?
+  
+  // AI (Aura)
+  auraEnabled         Boolean   @default(false)
+  auraVoice           String    @default("onyx")
+  auraAutoSummary     Boolean   @default(false)
+  
+  // Payment Handles (Zero-Fee System)
+  paypalHandle        String?
+  cashappHandle       String?
+  venmoHandle         String?
+  zelleHandle         String?
+  chimeHandle         String?
+  
+  // Cross-Platform Streaming Keys (Encrypted)
+  instagramStreamKey  String?
+  tiktokStreamKey     String?
+  facebookStreamKey   String?
+  youtubeStreamKey    String?
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  // Relations
+  streams             Stream[]
+}
+
+model Stream {
+  id                  String    @id @default(uuid())
+  creatorId           String
+  creator             Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  title               String
+  description         String?
+  category            Category?
+  thumbnailUrl        String?
+  
+  status              StreamStatus @default(SCHEDULED)
+  visibility          Visibility   @default(PUBLIC)
+  streamKey           String       @default(uuid()) // Internal key for RTMP coordination
+  
+  // Timestamps
+  scheduledAt         DateTime?
+  startedAt           DateTime?
+  endedAt             DateTime?
+  durationSeconds     Int          @default(0)
+  
+  // Analytics / Metrics
+  peakViewers         Int          @default(0)
+  totalViewers        Int          @default(0)
+  totalMessages       Int          @default(0)
+  totalSuperChat      Float        @default(0.0) // Kept as float for super chat totals
+
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+}
