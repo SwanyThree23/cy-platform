@@ -511,7 +511,7 @@ const StreamView: React.FC<{
   // @ts-ignore
   const [sendTransport, setSendTransport] = useState<any>(null);
   // @ts-ignore
-  const [recvTransports, setRecvTransports] = useState<any[]>([]);
+  const [recvTransports, setRecvTransports] = useState<Map<string, any>>(new Map());
   // @ts-ignore
   const [producers, setProducers] = useState<Map<string, any>>(new Map());
   // @ts-ignore
