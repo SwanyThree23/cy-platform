@@ -23,10 +23,6 @@ const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.HOST || "0.0.0.0";
 const NODE_ENV = process.env.NODE_ENV || "development";
 
-// Supabase Configuration
-const SUPABASE_URL = process.env.SUPABASE_URL || "";
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || "";
-
 // Encryption Key for Stream Credentials
 const ENCRYPTION_KEY =
   process.env.STREAM_ENCRYPTION_KEY || crypto.randomBytes(32).toString("hex");
@@ -416,9 +412,6 @@ class RTMPFanOutManager extends EventEmitter {
       await this.startPlatformStream(streamId, platform, config.url, streamKey);
       activePlatforms.add(platform);
     }
-
-    // Update database
-    await this.updateStreamPlatforms(streamId, platforms, true);
   }
 
   private async startPlatformStream(
@@ -429,20 +422,20 @@ class RTMPFanOutManager extends EventEmitter {
   ) {
     const processId = `${streamId}:${platform}`;
 
-    // Get user's encrypted stream key for this platform
-    const { data: streamData, error }: any = await supabase
-      .from("streams")
-      .select(`host:users!inner(${platform}_stream_key)`)
-      .eq("id", streamId)
-      .single();
+    // Get creator's encrypted stream key for this platform
+    const stream = await prisma.stream.findUnique({
+      where: { id: streamId },
+      include: { creator: true }
+    });
 
-    if (error || !streamData) {
-      console.error(`[RTMP] Failed to get stream key for ${platform}:`, error);
+    if (!stream || !stream.creator) {
+      console.error(`[RTMP] Failed to get stream/creator for ${platform}`);
       return;
     }
 
-    // Decrypt the platform-specific stream key
-    const encryptedKey = streamData.host[`${platform}_stream_key`];
+    const keyField = `${platform}StreamKey` as keyof typeof stream.creator;
+    const encryptedKey = stream.creator[keyField] as string;
+
     if (!encryptedKey) {
       console.warn(`[RTMP] No stream key configured for ${platform}`);
       return;
@@ -488,19 +481,31 @@ class RTMPFanOutManager extends EventEmitter {
     this.ffmpegProcesses.set(processId, ffmpegProcess);
 
     // Update relay status
-    await supabase.from("rtmp_relays").upsert(
-      {
-        stream_id: streamId,
+    await prisma.rtmpRelay.upsert({
+      where: {
+        streamId_platform: {
+          streamId: streamId,
+          platform: platform,
+        },
+      },
+      update: {
+        status: "active",
+        connectionStartedAt: new Date(),
+        lastError: null,
+      },
+      create: {
+        streamId: streamId,
         platform: platform,
         status: "active",
-        connection_started: new Date().toISOString(),
+        connectionStartedAt: new Date(),
       },
-      { onConflict: "stream_id,platform" },
-    );
+    });
   }
 
   private decryptStreamKey(encryptedKey: string): string {
     try {
+      // In production, use a real encryption key from environment
+      const ENCRYPTION_KEY = process.env.STREAM_ENCRYPTION_KEY || "fallback_secret";
       const decipher = crypto.createDecipher("aes-256-cbc", ENCRYPTION_KEY);
       let decrypted = decipher.update(encryptedKey, "hex", "utf8");
       decrypted += decipher.final("utf8");
@@ -518,16 +523,26 @@ class RTMPFanOutManager extends EventEmitter {
   ) {
     console.error(`[RTMP] Stream error for ${platform}:`, error);
 
-    await supabase.from("rtmp_relays").upsert(
-      {
-        stream_id: streamId,
+    await prisma.rtmpRelay.upsert({
+      where: {
+        streamId_platform: {
+          streamId: streamId,
+          platform: platform,
+        },
+      },
+      update: {
+        status: "error",
+        lastError: error,
+        connectionEndedAt: new Date(),
+      },
+      create: {
+        streamId: streamId,
         platform: platform,
         status: "error",
-        last_error: error,
-        connection_ended: new Date().toISOString(),
+        lastError: error,
+        connectionEndedAt: new Date(),
       },
-      { onConflict: "stream_id,platform" },
-    );
+    });
 
     this.emit("streamError", { streamId, platform, error });
   }
@@ -547,17 +562,16 @@ class RTMPFanOutManager extends EventEmitter {
     }
 
     // Update database
-    await supabase.from("rtmp_relays").upsert(
-      {
-        stream_id: streamId,
+    await prisma.rtmpRelay.updateMany({
+      where: {
+        streamId: streamId,
         platform: platform,
-        status: "inactive",
-        connection_ended: new Date().toISOString(),
       },
-      { onConflict: "stream_id,platform" },
-    );
-
-    await this.updateStreamPlatforms(streamId, [platform], false);
+      data: {
+        status: "inactive",
+        connectionEndedAt: new Date(),
+      },
+    });
 
     console.log(
       `[RTMP] Stopped streaming to ${platform} for stream: ${streamId}`,
@@ -573,19 +587,6 @@ class RTMPFanOutManager extends EventEmitter {
       this.activeStreams.delete(streamId);
     }
     console.log(`[RTMP] All streams stopped for: ${streamId}`);
-  }
-
-  private async updateStreamPlatforms(
-    streamId: string,
-    platforms: string[],
-    isActive: boolean,
-  ) {
-    const updates: Record<string, boolean> = {};
-    platforms.forEach((platform) => {
-      updates[`streaming_to_${platform}`] = isActive;
-    });
-
-    await supabase.from("streams").update(updates).eq("id", streamId);
   }
 
   getActiveStreams(): Map<string, Set<string>> {
@@ -763,29 +764,24 @@ class WatchPartyManager extends EventEmitter {
   async createParty(hostId: string, partyData: any) {
     const inviteCode = crypto.randomBytes(4).toString("hex").toUpperCase();
 
-    const { data, error } = await supabase
-      .from("watch_parties")
-      .insert({
-        host_id: hostId,
+    const data = await prisma.watchParty.create({
+      data: {
+        hostId: hostId,
         title: partyData.title,
         description: partyData.description,
-        video_url: partyData.videoUrl,
-        video_source: partyData.videoSource || "youtube",
-        video_id: partyData.videoId,
-        invite_code: inviteCode,
-        visibility: partyData.visibility || "public",
+        videoUrl: partyData.videoUrl,
+        videoSource: partyData.videoSource || "youtube",
+        videoId: partyData.videoId,
+        inviteCode: inviteCode,
+        visibility: (partyData.visibility?.toUpperCase() as any) || "PUBLIC",
         status: "active",
-      })
-      .select()
-      .single();
-
-    if (error)
-      throw new Error(`Failed to create watch party: ${error.message}`);
+      },
+    });
 
     this.activeParties.set(data.id, {
       hostId,
       inviteCode,
-      participants: new Map(), // userId -> { socketId, isReady, status }
+      participants: new Map(),
       playback: {
         currentTime: 0,
         isPlaying: false,
@@ -799,34 +795,37 @@ class WatchPartyManager extends EventEmitter {
   async joinParty(partyId: string, userId: string, socketId: string) {
     const party = this.activeParties.get(partyId);
     if (!party) {
-      // Try to load from DB if not in memory
-      const { data, error } = await supabase
-        .from("watch_parties")
-        .select("*")
-        .eq("id", partyId)
-        .single();
-      if (error || !data) throw new Error("Watch party not found");
+      const data = await prisma.watchParty.findUnique({
+        where: { id: partyId },
+      });
+      if (!data) throw new Error("Watch party not found");
 
-      // Initialize in memory
       this.activeParties.set(data.id, {
-        hostId: data.host_id,
-        inviteCode: data.invite_code,
+        hostId: data.hostId,
+        inviteCode: data.inviteCode,
         participants: new Map(),
         playback: {
-          currentTime: data.current_time_seconds || 0,
-          isPlaying: data.is_playing,
+          currentTime: data.currentTimeSeconds || 0,
+          isPlaying: data.isPlaying,
           lastUpdated: Date.now(),
         },
       });
     }
 
-    const { error } = await supabase.from("watch_party_participants").upsert({
-      watch_party_id: partyId,
-      user_id: userId,
-      status: "connected",
+    await prisma.watchPartyParticipant.upsert({
+      where: {
+        watchPartyId_userId: {
+          watchPartyId: partyId,
+          userId: userId,
+        },
+      },
+      update: { status: "connected" },
+      create: {
+        watchPartyId: partyId,
+        userId: userId,
+        status: "connected",
+      },
     });
-
-    if (error) throw error;
 
     const currentParty = this.activeParties.get(partyId);
     currentParty.participants.set(userId, {
@@ -838,6 +837,32 @@ class WatchPartyManager extends EventEmitter {
     return currentParty;
   }
 
+  async setReadyStatus(partyId: string, userId: string, isReady: boolean) {
+    const party = this.activeParties.get(partyId);
+    if (party) {
+      const participant = party.participants.get(userId);
+      if (participant) {
+        participant.isReady = isReady;
+
+        await prisma.watchPartyParticipant.update({
+          where: {
+            watchPartyId_userId: {
+              watchPartyId: partyId,
+              userId: userId,
+            },
+          },
+          data: {
+            isReady: isReady,
+            status: isReady ? "ready" : "connected",
+          },
+        });
+
+        return true;
+      }
+    }
+    return false;
+  }
+
   updatePlayback(partyId: string, currentTime: number, isPlaying: boolean) {
     const party = this.activeParties.get(partyId);
     if (party) {
@@ -846,31 +871,7 @@ class WatchPartyManager extends EventEmitter {
         isPlaying,
         lastUpdated: Date.now(),
       };
-
-      // debounced update to DB could go here
     }
-  }
-
-  async setReadyStatus(partyId: string, userId: string, isReady: boolean) {
-    const party = this.activeParties.get(partyId);
-    if (party) {
-      const participant = party.participants.get(userId);
-      if (participant) {
-        participant.isReady = isReady;
-
-        await supabase
-          .from("watch_party_participants")
-          .update({
-            is_ready: isReady,
-            status: isReady ? "ready" : "connected",
-          })
-          .eq("watch_party_id", partyId)
-          .eq("user_id", userId);
-
-        return true;
-      }
-    }
-    return false;
   }
 
   getPartyByInviteCode(inviteCode: string) {
@@ -897,48 +898,33 @@ class StreamManager extends EventEmitter {
   private activeStreams: Map<string, any> = new Map();
 
   async createStream(hostId: string, streamData: any) {
-    const streamKey = crypto.randomBytes(16).toString("hex");
-
-    const { data, error } = await supabase
-      .from("streams")
-      .insert({
-        host_id: hostId,
+    const data = await prisma.stream.create({
+      data: {
+        creatorId: hostId,
         title: streamData.title,
         description: streamData.description,
-        category_id: streamData.categoryId,
-        visibility: streamData.visibility || "public",
-        scheduled_start: streamData.scheduledStart,
-        status: "scheduled",
-        stream_key: streamKey,
-        layout_config: {
-          type: "gold_board_grid",
-          host_position: "top_left",
-          guest_slots: 20,
-          scroll_direction: "vertical",
-        },
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to create stream: ${error.message}`);
-    }
+        category: (streamData.category?.toUpperCase() as any) || "OTHER",
+        visibility: (streamData.visibility?.toUpperCase() as any) || "PUBLIC",
+        scheduledAt: streamData.scheduledStart ? new Date(streamData.scheduledStart) : null,
+        status: "SCHEDULED",
+        streamKey: crypto.randomBytes(16).toString("hex"),
+      },
+    });
 
     return data;
   }
 
   async goLive(streamId: string, platforms: string[] = []) {
-    const { data: stream, error } = await supabase
-      .from("streams")
-      .update({
-        status: "live",
-        actual_start: new Date().toISOString(),
-      })
-      .eq("id", streamId)
-      .select()
-      .single();
+    const stream = await prisma.stream.update({
+      where: { id: streamId },
+      data: {
+        status: "LIVE",
+        startedAt: new Date(),
+      },
+      include: { creator: true }
+    });
 
-    if (error || !stream) {
+    if (!stream) {
       throw new Error("Failed to start stream");
     }
 
@@ -947,31 +933,32 @@ class StreamManager extends EventEmitter {
 
     // Start RTMP fan-out to platforms
     if (platforms.length > 0) {
-      await rtmpManager.startFanOut(streamId, platforms, stream.stream_key);
+      await rtmpManager.startFanOut(streamId, platforms, stream.streamKey);
     }
 
     this.activeStreams.set(streamId, {
-      hostId: stream.host_id,
+      hostId: stream.creatorId,
       startTime: new Date(),
       viewers: new Set(),
-      guests: new Map(), // peerId -> grid position
+      guests: new Map(),
+      maxViewers: 0,
     });
 
-    this.emit("streamStarted", { streamId, hostId: stream.host_id });
+    this.emit("streamStarted", { streamId, hostId: stream.creatorId });
 
     return stream;
   }
 
   async endStream(streamId: string) {
-    const { error } = await supabase
-      .from("streams")
-      .update({
-        status: "ended",
-        ended_at: new Date().toISOString(),
-      })
-      .eq("id", streamId);
-
-    if (error) {
+    try {
+      await prisma.stream.update({
+        where: { id: streamId },
+        data: {
+          status: "ENDED",
+          endedAt: new Date(),
+        },
+      });
+    } catch (error) {
       console.error("Failed to end stream:", error);
     }
 
@@ -1016,21 +1003,20 @@ class StreamManager extends EventEmitter {
     if (stream) {
       stream.viewers.add(viewerId);
 
-      // Update current viewers count
-      await supabase
-        .from("streams")
-        .update({
-          current_viewers: stream.viewers.size,
-          total_views: supabase.rpc("increment", { row_id: streamId }),
-        })
-        .eq("id", streamId);
+      // Update current viewers count and total views
+      await prisma.stream.update({
+        where: { id: streamId },
+        data: {
+          totalViewers: { increment: 1 }
+        }
+      });
 
-      if (!stream.maxViewers || stream.viewers.size > stream.maxViewers) {
+      if (stream.viewers.size > stream.maxViewers) {
         stream.maxViewers = stream.viewers.size;
-        await supabase
-          .from("streams")
-          .update({ max_viewers: stream.maxViewers })
-          .eq("id", streamId);
+        await prisma.stream.update({
+          where: { id: streamId },
+          data: { peakViewers: stream.maxViewers }
+        });
       }
     }
   }
@@ -1039,11 +1025,6 @@ class StreamManager extends EventEmitter {
     const stream = this.activeStreams.get(streamId);
     if (stream) {
       stream.viewers.delete(viewerId);
-
-      await supabase
-        .from("streams")
-        .update({ current_viewers: stream.viewers.size })
-        .eq("id", streamId);
     }
   }
 
@@ -1058,8 +1039,8 @@ class StreamManager extends EventEmitter {
     }
 
     // Check if position is available
-    for (const [_, pos] of stream.guests.entries()) {
-      if (pos === gridPosition) {
+    for (const [_, guestData] of (stream.guests as Map<string, any>).entries()) {
+      if (guestData.gridPosition === gridPosition) {
         throw new Error("Grid position already occupied");
       }
     }
@@ -1072,12 +1053,14 @@ class StreamManager extends EventEmitter {
     });
 
     // Update database
-    await supabase.from("stream_guests").insert({
-      stream_id: streamId,
-      user_id: userId,
-      grid_position: gridPosition,
-      status: "connected",
-      joined_at: new Date().toISOString(),
+    await prisma.streamGuest.create({
+      data: {
+        streamId: streamId,
+        userId: userId,
+        gridPosition: gridPosition,
+        status: "connected",
+        joinedAt: new Date()
+      }
     });
 
     this.emit("guestJoined", { streamId, guestId, userId, gridPosition });
@@ -1091,14 +1074,17 @@ class StreamManager extends EventEmitter {
       const guest = stream.guests.get(guestId);
       stream.guests.delete(guestId);
 
-      await supabase
-        .from("stream_guests")
-        .update({
+      await prisma.streamGuest.updateMany({
+        where: {
+          streamId: streamId,
+          userId: guest.userId,
+          status: "connected"
+        },
+        data: {
           status: "disconnected",
-          left_at: new Date().toISOString(),
-        })
-        .eq("stream_id", streamId)
-        .eq("user_id", guest.userId);
+          leftAt: new Date()
+        }
+      });
 
       this.emit("guestLeft", { streamId, guestId, userId: guest.userId });
     }
@@ -1254,14 +1240,19 @@ app.get("/api/streams/:streamId/producers", (req, res) => {
 // Get active streams
 app.get("/api/streams", async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from("active_live_streams")
-      .select("*")
-      .order("actual_start", { ascending: false });
-
-    if (error) {
-      throw error;
-    }
+    const data = await prisma.stream.findMany({
+      where: { status: "LIVE" },
+      include: {
+        creator: {
+          select: {
+            handle: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: { startedAt: "desc" },
+    });
 
     res.json(data);
   } catch (error: any) {
@@ -1275,15 +1266,20 @@ app.get("/api/streams/:streamId", async (req, res) => {
   try {
     const { streamId } = req.params;
 
-    const { data, error } = await supabase
-      .from("streams")
-      .select(
-        "*, host:users!host_id(username, display_name, avatar_url, verification_status)",
-      )
-      .eq("id", streamId)
-      .single();
+    const data = await prisma.stream.findUnique({
+      where: { id: streamId },
+      include: {
+        creator: {
+          select: {
+            handle: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+    });
 
-    if (error) {
+    if (!data) {
       return res.status(404).json({ error: "Stream not found" });
     }
 
@@ -1339,28 +1335,32 @@ app.get("/api/users/:userId/payment-handles", async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const { data, error } = await supabase
-      .from("users")
-      .select(
-        "paypal_handle, cashapp_handle, venmo_handle, zelle_handle, chime_handle, display_name",
-      )
-      .eq("id", userId)
-      .single();
+    const data = await prisma.creator.findUnique({
+      where: { id: userId },
+      select: {
+        paypalHandle: true,
+        cashappHandle: true,
+        venmoHandle: true,
+        zelleHandle: true,
+        chimeHandle: true,
+        displayName: true,
+      },
+    });
 
-    if (error) {
+    if (!data) {
       return res.status(404).json({ error: "User not found" });
     }
 
     // Only return handles that are configured
     const handles: Record<string, string> = {};
-    if (data.paypal_handle) handles.paypal = data.paypal_handle;
-    if (data.cashapp_handle) handles.cashapp = data.cashapp_handle;
-    if (data.venmo_handle) handles.venmo = data.venmo_handle;
-    if (data.zelle_handle) handles.zelle = data.zelle_handle;
-    if (data.chime_handle) handles.chime = data.chime_handle;
+    if (data.paypalHandle) handles.paypal = data.paypalHandle;
+    if (data.cashappHandle) handles.cashapp = data.cashappHandle;
+    if (data.venmoHandle) handles.venmo = data.venmoHandle;
+    if (data.zelleHandle) handles.zelle = data.zelleHandle;
+    if (data.chimeHandle) handles.chime = data.chimeHandle;
 
     res.json({
-      displayName: data.display_name,
+      displayName: data.displayName,
       handles,
     });
   } catch (error: any) {
@@ -1375,22 +1375,16 @@ app.put("/api/users/:userId/payment-handles", async (req, res) => {
     const { userId } = req.params;
     const updates = req.body;
 
-    const { data, error } = await supabase
-      .from("users")
-      .update({
-        paypal_handle: updates.paypal,
-        cashapp_handle: updates.cashapp,
-        venmo_handle: updates.venmo,
-        zelle_handle: updates.zelle,
-        chime_handle: updates.chime,
-      })
-      .eq("id", userId)
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
+    const data = await prisma.creator.update({
+      where: { id: userId },
+      data: {
+        paypalHandle: updates.paypal,
+        cashappHandle: updates.cashapp,
+        venmoHandle: updates.venmo,
+        zelleHandle: updates.zelle,
+        chimeHandle: updates.chime,
+      },
+    });
 
     res.json(data);
   } catch (error: any) {
@@ -1405,23 +1399,18 @@ app.put("/api/users/:userId/stream-keys", async (req, res) => {
     const { userId } = req.params;
     const { platform, streamKey } = req.body;
 
+    const ENCRYPTION_KEY = process.env.STREAM_ENCRYPTION_KEY || "fallback_secret";
     // Encrypt the stream key
     const cipher = crypto.createCipher("aes-256-cbc", ENCRYPTION_KEY);
     let encrypted = cipher.update(streamKey, "utf8", "hex");
     encrypted += cipher.final("hex");
 
-    const columnName = `${platform}_stream_key`;
+    const keyField = `${platform}StreamKey`;
 
-    const { data, error } = await supabase
-      .from("users")
-      .update({ [columnName]: encrypted })
-      .eq("id", userId)
-      .select()
-      .single();
-
-    if (error) {
-      throw error;
-    }
+    const data = await prisma.creator.update({
+      where: { id: userId },
+      data: { [keyField]: encrypted },
+    });
 
     res.json({ success: true });
   } catch (error: any) {
@@ -1437,17 +1426,19 @@ app.put("/api/users/:userId/stream-keys", async (req, res) => {
 // Get all marketplace video posts
 app.get("/api/marketplace", async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from("video_posts")
-      .select(
-        `
-        *,
-        author:users(username, display_name, avatar_url)
-      `,
-      )
-      .order("created_at", { ascending: false });
+    const data = await prisma.videoPost.findMany({
+      include: {
+        creator: {
+          select: {
+            handle: true,
+            displayName: true,
+            avatarUrl: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
 
-    if (error) throw error;
     res.json(data);
   } catch (error: any) {
     console.error("Error fetching marketplace:", error);
@@ -1468,22 +1459,19 @@ app.post("/api/marketplace", async (req, res) => {
       isForSale,
     } = req.body;
 
-    const { data, error } = await supabase
-      .from("video_posts")
-      .insert({
-        user_id: userId,
+    const data = await prisma.videoPost.create({
+      data: {
+        creatorId: userId,
         title,
         description,
-        video_url: videoUrl,
-        thumbnail_url: thumbnailUrl,
-        price,
-        is_for_sale: isForSale,
+        videoUrl,
+        thumbnailUrl,
+        price: parseFloat(price),
+        isForSale: Boolean(isForSale),
         status: "active",
-      })
-      .select()
-      .single();
+      },
+    });
 
-    if (error) throw error;
     res.status(201).json(data);
   } catch (error: any) {
     console.error("Error creating marketplace post:", error);
@@ -1498,29 +1486,25 @@ app.post("/api/marketplace/purchase", async (req, res) => {
       req.body;
 
     // Get seller ID from video post
-    const { data: videoPost, error: postError } = await supabase
-      .from("video_posts")
-      .select("user_id")
-      .eq("id", videoPostId)
-      .single();
+    const videoPost = await prisma.videoPost.findUnique({
+      where: { id: videoPostId },
+      select: { creatorId: true },
+    });
 
-    if (postError || !videoPost) throw new Error("Video post not found");
+    if (!videoPost) throw new Error("Video post not found");
 
-    const { data, error } = await supabase
-      .from("marketplace_purchases")
-      .insert({
-        video_post_id: videoPostId,
-        buyer_id: buyerId,
-        seller_id: videoPost.user_id,
-        amount,
-        payment_method: paymentMethod,
-        external_transaction_id: transactionId,
+    const data = await prisma.marketplacePurchase.create({
+      data: {
+        videoPostId: videoPostId,
+        buyerId: buyerId,
+        sellerId: videoPost.creatorId,
+        amount: parseFloat(amount),
+        paymentMethod: paymentMethod,
+        transactionId: transactionId,
         status: "completed",
-      })
-      .select()
-      .single();
+      },
+    });
 
-    if (error) throw error;
     res.status(201).json(data);
   } catch (error: any) {
     console.error("Error recording purchase:", error);
@@ -1671,24 +1655,17 @@ io.on("connection", (socket) => {
       });
 
       // Store message in database
-      const { data, error } = await supabase
-        .from("chat_messages")
-        .insert({
-          stream_id: streamId,
-          user_id: userId,
-          message:
-            moderation.action === "delete" ? "[Message removed]" : message,
-          ai_moderated: true,
-          ai_confidence: moderation.confidence,
-          ai_action: moderation.action,
-          is_deleted: moderation.action === "delete",
-        })
-        .select()
-        .single();
-
-      if (error) {
-        throw error;
-      }
+      const data = await prisma.chatMessage.create({
+        data: {
+          streamId: streamId,
+          userId: userId,
+          message: moderation.action === "delete" ? "[Message removed]" : message,
+          aiModerated: true,
+          aiConfidence: moderation.confidence,
+          aiAction: moderation.action,
+          isDeleted: moderation.action === "delete",
+        },
+      });
 
       // Broadcast message (or moderation notice)
       if (moderation.action === "delete") {
@@ -1701,9 +1678,8 @@ io.on("connection", (socket) => {
           id: data.id,
           userId,
           username,
-          message:
-            moderation.action === "flag" ? `[Flagged] ${message}` : message,
-          timestamp: data.created_at,
+          message: moderation.action === "flag" ? `[Flagged] ${message}` : message,
+          timestamp: data.createdAt,
         });
       }
 

@@ -90,6 +90,11 @@ model Creator {
   
   // Relations
   streams             Stream[]
+  watchParties        WatchParty[]
+  videoPosts          VideoPost[]
+  paymentsReceived    Payment[]      @relation("RecipientPayments")
+  subscriptions       Subscription[]
+  follows             Follow[]       @relation("Following")
 }
 
 model Stream {
@@ -120,6 +125,43 @@ model Stream {
 
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
+
+  guests              StreamGuest[]
+  relays              RtmpRelay[]
+  chatMessages        ChatMessage[]
+  payments            Payment[]
+}
+
+model RtmpRelay {
+  id                  String    @id @default(uuid())
+  streamId            String
+  stream              Stream    @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  platform            String
+  status              String    @default("inactive")
+  lastError           String?
+  connectionStartedAt DateTime?
+  connectionEndedAt   DateTime?
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([streamId, platform])
+}
+
+model StreamGuest {
+  id                  String    @id @default(uuid())
+  streamId            String
+  stream              Stream    @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  userId              String
+  gridPosition        Int
+  status              String    @default("connected")
+  joinedAt            DateTime  @default(now())
+  leftAt              DateTime?
+
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([streamId, userId, gridPosition])
 }
 
 model WatchParty {
@@ -157,4 +199,117 @@ model WatchPartyParticipant {
   updatedAt           DateTime   @updatedAt
 
   @@unique([watchPartyId, userId])
+}
+
+model VideoPost {
+  id                  String    @id @default(uuid())
+  creatorId           String
+  creator             Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  title               String
+  description         String?
+  videoUrl            String
+  thumbnailUrl        String?
+  
+  price               Float     @default(0.0)
+  currency            String    @default("USD")
+  isForSale           Boolean   @default(true)
+  
+  viewsCount          Int       @default(0)
+  likesCount          Int       @default(0)
+  status              String    @default("active")
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  purchases           MarketplacePurchase[]
+}
+
+model MarketplacePurchase {
+  id                  String    @id @default(uuid())
+  videoPostId         String
+  videoPost           VideoPost @relation(fields: [videoPostId], references: [id], onDelete: Cascade)
+  buyerId             String
+  sellerId            String
+  
+  amount              Float
+  currency            String    @default("USD")
+  
+  paymentMethod       String?
+  transactionId       String?   @unique
+  status              String    @default("completed")
+  
+  createdAt           DateTime  @default(now())
+}
+
+model ChatMessage {
+  id                  String    @id @default(uuid())
+  streamId            String
+  stream              Stream    @relation(fields: [streamId], references: [id], onDelete: Cascade)
+  userId              String    // Can be a creator or viewer clerkId
+  message             String
+  
+  aiModerated         Boolean   @default(false)
+  aiConfidence        Float?
+  aiAction            String?
+  aiReason            String?
+  isDeleted           Boolean   @default(false)
+  
+  createdAt           DateTime  @default(now())
+}
+
+model Payment {
+  id                  String    @id @default(uuid())
+  streamId            String?
+  stream              Stream?   @relation(fields: [streamId], references: [id], onDelete: SetNull)
+  senderId            String?
+  recipientId         String
+  recipient           Creator   @relation("RecipientPayments", fields: [recipientId], references: [id], onDelete: Cascade)
+  
+  amount              Float
+  currency            String    @default("USD")
+  paymentMethod       String    // paypal, cashapp, venmo, zelle, chime
+  
+  platformFee         Float     @default(0.0)
+  status              String    @default("pending")
+  externalTransactionId String?
+  
+  message             String?
+  isAnonymous         Boolean   @default(false)
+  
+  createdAt           DateTime  @default(now())
+  completedAt         DateTime?
+}
+
+model Subscription {
+  id                  String    @id @default(uuid())
+  creatorId           String
+  creator             Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  tier                String    // premium, pro
+  
+  amount              Float
+  currency            String    @default("USD")
+  billingCycle        String    @default("monthly")
+  
+  status              String    @default("active")
+  startedAt           DateTime  @default(now())
+  expiresAt           DateTime?
+  cancelledAt         DateTime?
+  
+  provider            String?   // stripe, paypal
+  providerSubscriptionId String?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model Follow {
+  id                  String    @id @default(uuid())
+  followerId          String
+  followingId         String
+  following           Creator   @relation("Following", fields: [followingId], references: [id], onDelete: Cascade)
+  
+  createdAt           DateTime  @default(now())
+
+  @@unique([followerId, followingId])
 }
