@@ -508,7 +508,13 @@ const StreamView: React.FC<{
   // Mediasoup state
   // @ts-ignore
   const [device, setDevice] = useState<Device | null>(null);
+  // @ts-ignore
+  const [sendTransport, setSendTransport] = useState<any>(null);
+  // @ts-ignore
+  const [recvTransports, setRecvTransports] = useState<any[]>([]);
+  // @ts-ignore
   const [producers, setProducers] = useState<Map<string, any>>(new Map());
+  // @ts-ignore
   const [consumers, setConsumers] = useState<Map<string, any>>(new Map());
 
   // Initialize Mediasoup device
