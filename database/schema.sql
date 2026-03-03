@@ -21,7 +21,7 @@ CREATE TYPE visibility_type AS ENUM ('public', 'followers', 'private');
 -- TABLE: users
 -- ============================================
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     username VARCHAR(30) UNIQUE NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
@@ -62,11 +62,11 @@ CREATE TABLE users (
 );
 
 -- Create index on frequently queried columns
-CREATE INDEX idx_users_username ON users(username);
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_users_verification ON users(verification_status);
-CREATE INDEX idx_users_account_type ON users(account_type);
-CREATE INDEX idx_users_active ON users(is_active) WHERE is_active = TRUE;
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_verification ON users(verification_status);
+CREATE INDEX IF NOT EXISTS idx_users_account_type ON users(account_type);
+CREATE INDEX IF NOT EXISTS idx_users_active ON users(is_active) WHERE is_active = TRUE;
 
 -- ============================================
 -- TABLE: categories
@@ -97,7 +97,7 @@ INSERT INTO categories (name, description, sort_order) VALUES
 -- TABLE: streams
 -- ============================================
 
-CREATE TABLE streams (
+CREATE TABLE IF NOT EXISTS streams (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     host_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title VARCHAR(200) NOT NULL,
@@ -145,18 +145,18 @@ CREATE TABLE streams (
 );
 
 -- Create indexes for streams
-CREATE INDEX idx_streams_host ON streams(host_id);
-CREATE INDEX idx_streams_status ON streams(status);
-CREATE INDEX idx_streams_category ON streams(category_id);
-CREATE INDEX idx_streams_visibility ON streams(visibility);
-CREATE INDEX idx_streams_live ON streams(status) WHERE status = 'live';
-CREATE INDEX idx_streams_scheduled ON streams(status, scheduled_start) WHERE status = 'scheduled';
+CREATE INDEX IF NOT EXISTS idx_streams_host ON streams(host_id);
+CREATE INDEX IF NOT EXISTS idx_streams_status ON streams(status);
+CREATE INDEX IF NOT EXISTS idx_streams_category ON streams(category_id);
+CREATE INDEX IF NOT EXISTS idx_streams_visibility ON streams(visibility);
+CREATE INDEX IF NOT EXISTS idx_streams_live ON streams(status) WHERE status = 'live';
+CREATE INDEX IF NOT EXISTS idx_streams_scheduled ON streams(status, scheduled_start) WHERE status = 'scheduled';
 
 -- ============================================
 -- TABLE: stream_guests
 -- ============================================
 
-CREATE TABLE stream_guests (
+CREATE TABLE IF NOT EXISTS stream_guests (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     stream_id UUID NOT NULL REFERENCES streams(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -185,15 +185,15 @@ CREATE TABLE stream_guests (
     UNIQUE(stream_id, grid_position)
 );
 
-CREATE INDEX idx_stream_guests_stream ON stream_guests(stream_id);
-CREATE INDEX idx_stream_guests_user ON stream_guests(user_id);
-CREATE INDEX idx_stream_guests_status ON stream_guests(status);
+CREATE INDEX IF NOT EXISTS idx_stream_guests_stream ON stream_guests(stream_id);
+CREATE INDEX IF NOT EXISTS idx_stream_guests_user ON stream_guests(user_id);
+CREATE INDEX IF NOT EXISTS idx_stream_guests_status ON stream_guests(status);
 
 -- ============================================
 -- TABLE: payments (Zero-Fee Tracking)
 -- ============================================
 
-CREATE TABLE payments (
+CREATE TABLE IF NOT EXISTS payments (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     stream_id UUID REFERENCES streams(id) ON DELETE SET NULL,
     sender_id UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -224,17 +224,17 @@ CREATE TABLE payments (
     revenue_split_percentage DECIMAL(5, 2) DEFAULT 90.00
 );
 
-CREATE INDEX idx_payments_stream ON payments(stream_id);
-CREATE INDEX idx_payments_recipient ON payments(recipient_id);
-CREATE INDEX idx_payments_sender ON payments(sender_id);
-CREATE INDEX idx_payments_status ON payments(status);
-CREATE INDEX idx_payments_created ON payments(created_at);
+CREATE INDEX IF NOT EXISTS idx_payments_stream ON payments(stream_id);
+CREATE INDEX IF NOT EXISTS idx_payments_recipient ON payments(recipient_id);
+CREATE INDEX IF NOT EXISTS idx_payments_sender ON payments(sender_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_payments_created ON payments(created_at);
 
 -- ============================================
 -- TABLE: subscriptions (Platform Revenue)
 -- ============================================
 
-CREATE TABLE subscriptions (
+CREATE TABLE IF NOT EXISTS subscriptions (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     tier VARCHAR(50) NOT NULL, -- premium, pro
@@ -258,14 +258,14 @@ CREATE TABLE subscriptions (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_subscriptions_user ON subscriptions(user_id);
-CREATE INDEX idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_user ON subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
 
 -- ============================================
 -- TABLE: followers
 -- ============================================
 
-CREATE TABLE followers (
+CREATE TABLE IF NOT EXISTS followers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     follower_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     following_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -274,14 +274,14 @@ CREATE TABLE followers (
     UNIQUE(follower_id, following_id)
 );
 
-CREATE INDEX idx_followers_follower ON followers(follower_id);
-CREATE INDEX idx_followers_following ON followers(following_id);
+CREATE INDEX IF NOT EXISTS idx_followers_follower ON followers(follower_id);
+CREATE INDEX IF NOT EXISTS idx_followers_following ON followers(following_id);
 
 -- ============================================
 -- TABLE: chat_messages
 -- ============================================
 
-CREATE TABLE chat_messages (
+CREATE TABLE IF NOT EXISTS chat_messages (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     stream_id UUID NOT NULL REFERENCES streams(id) ON DELETE CASCADE,
     user_id UUID REFERENCES users(id) ON DELETE SET NULL, -- NULL for system messages
@@ -302,9 +302,9 @@ CREATE TABLE chat_messages (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_chat_stream ON chat_messages(stream_id);
-CREATE INDEX idx_chat_user ON chat_messages(user_id);
-CREATE INDEX idx_chat_created ON chat_messages(created_at);
+CREATE INDEX IF NOT EXISTS idx_chat_stream ON chat_messages(stream_id);
+CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_created ON chat_messages(created_at);
 
 -- ============================================
 -- TABLE: rtmp_relays (Cross-Platform Fan-out)
@@ -486,7 +486,7 @@ COMMENT ON TABLE rtmp_relays IS 'Cross-platform streaming relay configurations';
 -- TABLE: watch_parties
 -- ============================================
 
-CREATE TABLE watch_parties (
+CREATE TABLE IF NOT EXISTS watch_parties (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     host_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title VARCHAR(200) NOT NULL,
@@ -503,15 +503,15 @@ CREATE TABLE watch_parties (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
-CREATE INDEX idx_watch_parties_host ON watch_parties(host_id);
-CREATE INDEX idx_watch_parties_invite ON watch_parties(invite_code);
-CREATE INDEX idx_watch_parties_status ON watch_parties(status);
+CREATE INDEX IF NOT EXISTS idx_watch_parties_host ON watch_parties(host_id);
+CREATE INDEX IF NOT EXISTS idx_watch_parties_invite ON watch_parties(invite_code);
+CREATE INDEX IF NOT EXISTS idx_watch_parties_status ON watch_parties(status);
 
 -- ============================================
 -- TABLE: watch_party_participants
 -- ============================================
 
-CREATE TABLE watch_party_participants (
+CREATE TABLE IF NOT EXISTS watch_party_participants (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     watch_party_id UUID NOT NULL REFERENCES watch_parties(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -522,7 +522,7 @@ CREATE TABLE watch_party_participants (
     UNIQUE(watch_party_id, user_id)
 );
 
-CREATE INDEX idx_wp_participants_party ON watch_party_participants(watch_party_id);
+CREATE INDEX IF NOT EXISTS idx_wp_participants_party ON watch_party_participants(watch_party_id);
 -- ============================================
 -- TABLE: video_posts (Marketplace)
 -- ============================================
