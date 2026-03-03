@@ -102,9 +102,15 @@ const RTMP_CONFIG = {
 
 const app = express();
 const httpServer = createServer(app);
+const allowedOrigins = [
+  process.env.FRONTEND_URL || "http://localhost:3000",
+  "http://srv1327929.hstgr.cloud",
+  "http://76.13.31.91",
+];
+
 const io = new Server(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -127,7 +133,7 @@ app.use(
 app.use(compression());
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: allowedOrigins,
     credentials: true,
   }),
 );
@@ -159,7 +165,9 @@ class MediasoupManager extends EventEmitter {
     console.log(`[Mediasoup] Initializing ${numWorkers} workers...`);
 
     for (let i = 0; i < numWorkers; i++) {
-      const worker = await mediasoup.createWorker(MEDIASOUP_CONFIG.worker as mediasoup.types.WorkerSettings);
+      const worker = await mediasoup.createWorker(
+        MEDIASOUP_CONFIG.worker as mediasoup.types.WorkerSettings,
+      );
 
       worker.on("died", () => {
         console.error(`[Mediasoup] Worker ${i} died, restarting...`);
@@ -173,7 +181,9 @@ class MediasoupManager extends EventEmitter {
   }
 
   private async restartWorker(index: number) {
-    const worker = await mediasoup.createWorker(MEDIASOUP_CONFIG.worker as mediasoup.types.WorkerSettings);
+    const worker = await mediasoup.createWorker(
+      MEDIASOUP_CONFIG.worker as mediasoup.types.WorkerSettings,
+    );
     this.workers[index] = worker;
     console.log(`[Mediasoup] Worker ${index} restarted`);
   }
@@ -191,7 +201,8 @@ class MediasoupManager extends EventEmitter {
 
     const worker = this.getNextWorker();
     const router = await worker.createRouter({
-      mediaCodecs: MEDIASOUP_CONFIG.router.mediaCodecs as mediasoup.types.RtpCodecCapability[],
+      mediaCodecs: MEDIASOUP_CONFIG.router
+        .mediaCodecs as mediasoup.types.RtpCodecCapability[],
     });
 
     this.routers.set(roomId, router);
@@ -1396,10 +1407,12 @@ app.get("/api/marketplace", async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("video_posts")
-      .select(`
+      .select(
+        `
         *,
         author:users(username, display_name, avatar_url)
-      `)
+      `,
+      )
       .order("created_at", { ascending: false });
 
     if (error) throw error;
@@ -1413,14 +1426,14 @@ app.get("/api/marketplace", async (req, res) => {
 // Create new marketplace video post
 app.post("/api/marketplace", async (req, res) => {
   try {
-    const { 
-      userId, 
-      title, 
-      description, 
-      videoUrl, 
-      thumbnailUrl, 
-      price, 
-      isForSale 
+    const {
+      userId,
+      title,
+      description,
+      videoUrl,
+      thumbnailUrl,
+      price,
+      isForSale,
     } = req.body;
 
     const { data, error } = await supabase
@@ -1433,7 +1446,7 @@ app.post("/api/marketplace", async (req, res) => {
         thumbnail_url: thumbnailUrl,
         price,
         is_for_sale: isForSale,
-        status: "active"
+        status: "active",
       })
       .select()
       .single();
@@ -1449,7 +1462,8 @@ app.post("/api/marketplace", async (req, res) => {
 // Purchase a video post
 app.post("/api/marketplace/purchase", async (req, res) => {
   try {
-    const { videoPostId, buyerId, amount, paymentMethod, transactionId } = req.body;
+    const { videoPostId, buyerId, amount, paymentMethod, transactionId } =
+      req.body;
 
     // Get seller ID from video post
     const { data: videoPost, error: postError } = await supabase
@@ -1469,7 +1483,7 @@ app.post("/api/marketplace/purchase", async (req, res) => {
         amount,
         payment_method: paymentMethod,
         external_transaction_id: transactionId,
-        status: "completed"
+        status: "completed",
       })
       .select()
       .single();
@@ -1485,7 +1499,6 @@ app.post("/api/marketplace/purchase", async (req, res) => {
 // ============================================
 // SOCKET.IO HANDLERS
 // ============================================
-
 
 io.on("connection", (socket) => {
   console.log(`[Socket] Client connected: ${socket.id}`);
@@ -1744,16 +1757,22 @@ io.on("connection", (socket) => {
   socket.on("join-watch-party", async ({ partyId, userId }) => {
     try {
       socket.join(`party:${partyId}`);
-      const party = await watchPartyManager.joinParty(partyId, userId, socket.id);
-      
+      const party = await watchPartyManager.joinParty(
+        partyId,
+        userId,
+        socket.id,
+      );
+
       socket.emit("watch-party-joined", {
         partyId,
         playback: party.playback,
-        participants: Array.from(party.participants.entries()).map((item: any) => ({
-          userId: item[0],
-          isReady: item[1].isReady,
-          status: item[1].status,
-        })),
+        participants: Array.from(party.participants.entries()).map(
+          (item: any) => ({
+            userId: item[0],
+            isReady: item[1].isReady,
+            status: item[1].status,
+          }),
+        ),
       });
 
       socket.to(`party:${partyId}`).emit("participant-joined", {
@@ -1763,47 +1782,56 @@ io.on("connection", (socket) => {
 
       console.log(`[Socket] User ${userId} joined watch party ${partyId}`);
     } catch (error: any) {
-      console.error('[Socket] Error joining watch party:', error);
-      socket.emit('error', { message: error.message });
+      console.error("[Socket] Error joining watch party:", error);
+      socket.emit("error", { message: error.message });
     }
   });
 
-  socket.on("watch-party-sync-playback", ({ partyId, currentTime, isPlaying }) => {
-    watchPartyManager.updatePlayback(partyId, currentTime, isPlaying);
-    socket.to(`party:${partyId}`).emit("playback-updated", {
-      currentTime,
-      isPlaying,
-      senderId: socket.id,
-    });
-  });
+  socket.on(
+    "watch-party-sync-playback",
+    ({ partyId, currentTime, isPlaying }) => {
+      watchPartyManager.updatePlayback(partyId, currentTime, isPlaying);
+      socket.to(`party:${partyId}`).emit("playback-updated", {
+        currentTime,
+        isPlaying,
+        senderId: socket.id,
+      });
+    },
+  );
 
-  socket.on("watch-party-ready-status", async ({ partyId, userId, isReady }) => {
-    await watchPartyManager.setReadyStatus(partyId, userId, isReady);
-    io.to(`party:${partyId}`).emit("participant-ready-change", {
-      userId,
-      isReady,
-    });
-  });
+  socket.on(
+    "watch-party-ready-status",
+    async ({ partyId, userId, isReady }) => {
+      await watchPartyManager.setReadyStatus(partyId, userId, isReady);
+      io.to(`party:${partyId}`).emit("participant-ready-change", {
+        userId,
+        isReady,
+      });
+    },
+  );
 
   // AI Assistance in Watch Party
-  socket.on("ask-party-ai", async ({ partyId, prompt, userId: _userId, username, model }) => {
-    try {
-      // Get context (last messages or current video info)
-      const context = { partyId, triggerUser: username };
-      
-      const aiResponse = await swaniAI.askAI(prompt, context, model);
-      
-      io.to(`party:${partyId}`).emit("ai-response", {
-        message: aiResponse,
-        model: model || "default",
-        userId: "swani-ai",
-        username: "SWANI AI",
-        timestamp: new Date().toISOString(),
-      });
-    } catch (error: any) {
-      console.error("[Socket] AI error in watch party:", error);
-    }
-  });
+  socket.on(
+    "ask-party-ai",
+    async ({ partyId, prompt, userId: _userId, username, model }) => {
+      try {
+        // Get context (last messages or current video info)
+        const context = { partyId, triggerUser: username };
+
+        const aiResponse = await swaniAI.askAI(prompt, context, model);
+
+        io.to(`party:${partyId}`).emit("ai-response", {
+          message: aiResponse,
+          model: model || "default",
+          userId: "swani-ai",
+          username: "SWANI AI",
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error: any) {
+        console.error("[Socket] AI error in watch party:", error);
+      }
+    },
+  );
 
   // Payment notification (for live display)
   socket.on("payment-sent", ({ streamId, amount, senderName, message }) => {
