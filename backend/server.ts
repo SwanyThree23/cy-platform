@@ -141,6 +141,79 @@ app.use(
     credentials: true,
   }),
 );
+// ============================================
+// WEBHOOKS (Raw Body Required)
+// ============================================
+
+// Stripe Webhook
+app.post(
+  "/api/webhooks/stripe",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const sig = req.headers["stripe-signature"] as string;
+    let event;
+
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET || ""
+      );
+    } catch (err: any) {
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+      const metadata = session.metadata;
+
+      if (metadata && metadata.videoPostId) {
+        // Record purchase in DB
+        await prisma.payment.create({
+          data: {
+            amount: (session.amount_total || 0) / 100,
+            currency: session.currency || "usd",
+            userId: metadata.buyerId,
+            creatorId: metadata.creatorId,
+            type: "MARKETPLACE_PURCHASE",
+            status: "COMPLETED",
+            stripeSessionId: session.id,
+          },
+        });
+        
+        console.log(`[Stripe] Purchase confirmed for post ${metadata.videoPostId}`);
+      }
+    }
+
+    res.json({ received: true });
+  }
+);
+
+// Mux Webhook
+app.post("/api/webhooks/mux", express.json(), async (req, res) => {
+  const { type, data } = req.body;
+
+  if (type === "video.asset.ready") {
+    const assetId = data.id;
+    const playbackId = data.playback_ids?.[0]?.id;
+
+    if (playbackId) {
+      // Update video post status to active/ready
+      await prisma.videoPost.updateMany({
+        where: { muxAssetId: assetId },
+        data: {
+          videoUrl: `https://stream.mux.com/${playbackId}.m3u8`,
+          thumbnailUrl: `https://image.mux.com/${playbackId}/thumbnail.jpg`,
+          status: "READY",
+        },
+      });
+      console.log(`[Mux] Asset ${assetId} is now READY`);
+    }
+  }
+
+  res.json({ received: true });
+});
+
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
@@ -1524,6 +1597,11 @@ app.post("/api/marketplace/create-checkout", requireAuth, async (req: any, res: 
         quantity: 1,
       }],
       mode: "payment",
+      metadata: {
+        videoPostId: post.id,
+        buyerId: req.auth.userId, // Clerk ID of buyer
+        creatorId: post.creatorId, // Internal ID of seller
+      },
       success_url: `${process.env.FRONTEND_URL}/marketplace?purchase_success=true&id=${post.id}`,
       cancel_url: `${process.env.FRONTEND_URL}/marketplace?purchase_cancel=true`,
       payment_intent_data: {
@@ -1579,6 +1657,7 @@ app.post("/api/marketplace", async (req, res) => {
       thumbnailUrl,
       price,
       isForSale,
+      muxAssetId, // From Mux upload logic
     } = req.body;
 
     const data = await prisma.videoPost.create({
@@ -1590,7 +1669,8 @@ app.post("/api/marketplace", async (req, res) => {
         thumbnailUrl,
         price: parseFloat(price),
         isForSale: Boolean(isForSale),
-        status: "active",
+        status: muxAssetId ? "PROCESSING" : "READY",
+        muxAssetId,
       },
     });
 

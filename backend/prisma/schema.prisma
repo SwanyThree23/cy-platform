@@ -219,6 +219,10 @@ model VideoPost {
   likesCount          Int       @default(0)
   status              String    @default("active")
   
+  // Mux Asset Tracking
+  muxAssetId          String?
+  muxPlaybackId       String?
+  
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
@@ -276,6 +280,11 @@ model Payment {
   
   message             String?
   isAnonymous         Boolean   @default(false)
+  
+  // Platform Type & Tracking
+  type                String?   @default("DONATION") // DONATION, SUBSCRIPTION, MARKETPLACE_PURCHASE
+  stripeSessionId     String?   @unique
+  userId              String?   // Buyer/Sender ID
   
   createdAt           DateTime  @default(now())
   completedAt         DateTime?

@@ -52,14 +52,17 @@ services:
       PORT: 3001
       HOST: 0.0.0.0
       DATABASE_URL: postgresql://cyuser:${DB_PASSWORD:-changeme}@postgres:5432/cyplatform
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_SERVICE_KEY: ${SUPABASE_SERVICE_KEY}
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      MUX_TOKEN_ID: ${MUX_TOKEN_ID}
+      MUX_TOKEN_SECRET: ${MUX_TOKEN_SECRET}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       STREAM_ENCRYPTION_KEY: ${STREAM_ENCRYPTION_KEY}
-      JWT_SECRET: ${JWT_SECRET}
       MEDIASOUP_LISTEN_IP: 0.0.0.0
       MEDIASOUP_ANNOUNCED_IP: ${MEDIASOUP_ANNOUNCED_IP:-backend}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
-      LLM_MODEL: ${LLM_MODEL:-anthropic/claude-3.5-sonnet}
       REDIS_URL: redis://redis:6379
     ports:
       - "3001:3001"
@@ -72,6 +75,28 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    restart: always
+
+  # ============================================
+  # Background Worker
+  # ============================================
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cy-worker
+    command: npm run start-worker
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      DATABASE_URL: postgresql://cyuser:${DB_PASSWORD:-changeme}@postgres:5432/cyplatform
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      MUX_TOKEN_ID: ${MUX_TOKEN_ID}
+      MUX_TOKEN_SECRET: ${MUX_TOKEN_SECRET}
+    networks:
+      - cy-network
+    depends_on:
+      postgres:
+        condition: service_healthy
     restart: always
 
   # ============================================

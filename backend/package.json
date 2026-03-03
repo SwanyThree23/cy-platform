@@ -5,8 +5,10 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch server.ts",
+    "dev-worker": "tsx watch worker.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "start-worker": "node dist/worker.js",
     "lint": "eslint . --ext .ts",
     "typecheck": "tsc --noEmit"
   },
