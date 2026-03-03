@@ -272,6 +272,7 @@ class MediasoupManager extends EventEmitter {
   public transports: Map<string, mediasoup.types.WebRtcTransport> = new Map();
   public producers: Map<string, mediasoup.types.Producer> = new Map();
   public consumers: Map<string, mediasoup.types.Consumer> = new Map();
+  public plainTransports: Map<string, mediasoup.types.PlainTransport> = new Map();
   private nextWorkerIndex = 0;
 
   async initialize(numWorkers = 2) {
@@ -348,6 +349,23 @@ class MediasoupManager extends EventEmitter {
       `[Mediasoup] WebRTC Transport created for peer: ${peerId} in room: ${roomId}`,
     );
 
+    return transport;
+  }
+
+  async createPlainRtpTransport(
+    roomId: string,
+  ): Promise<mediasoup.types.PlainTransport> {
+    const router = await this.createRouter(roomId);
+
+    const transport = await router.createPlainTransport({
+      listenIp: { ip: "0.0.0.0", announcedIp: process.env.MEDIASOUP_ANNOUNCED_IP || "127.0.0.1" },
+      rtcpMux: false,
+      comedia: true,
+    });
+
+    this.plainTransports.set(`${roomId}:plain`, transport);
+    
+    console.log(`[Mediasoup] Plain RTP Transport created for room: ${roomId}`);
     return transport;
   }
 
@@ -680,6 +698,128 @@ class RTMPFanOutManager extends EventEmitter {
 }
 
 const rtmpManager = new RTMPFanOutManager();
+
+// ============================================
+// INGEST & BRIDGE MANAGER (RTMP -> WebRTC)
+// ============================================
+
+class IngestManager extends EventEmitter {
+  private ingests: Map<string, any> = new Map();
+
+  async startIngestBridge(streamId: string, streamKey: string) {
+    console.log(`[Ingest] Starting bridge for stream ${streamId}`);
+    
+    try {
+      const router = await mediasoupManager.createRouter(streamId);
+      
+      // 1. Create a PlainRtpTransport for the stream
+      const transport = await router.createPlainTransport({
+        listenIp: { ip: "0.0.0.0", announcedIp: process.env.MEDIASOUP_ANNOUNCED_IP || "127.0.0.1" },
+        rtcpMux: false,
+        comedia: true,
+      });
+
+      // 2. Create Producers for Video and Audio
+      // We manually define RTP parameters that FFmpeg will follow
+      const videoProducer = await transport.produce({
+        kind: 'video',
+        rtpParameters: {
+          codecs: [{
+            mimeType: 'video/H264',
+            clockRate: 90000,
+            payloadType: 101,
+            parameters: { 'packetization-mode': 1, 'profile-level-id': '4d0032' }
+          }],
+          encodings: [{ ssrc: 11111111 }]
+        }
+      });
+
+      const audioProducer = await transport.produce({
+        kind: 'audio',
+        rtpParameters: {
+          codecs: [{
+            mimeType: 'audio/opus',
+            clockRate: 48000,
+            payloadType: 100,
+            channels: 2
+          }],
+          encodings: [{ ssrc: 22222222 }]
+        }
+      });
+
+      // Notify the room about the host's bridge producer
+      io.to(streamId).emit("new-producer", {
+        producerId: videoProducer.id,
+        kind: 'video',
+        socketId: 'server-ingest',
+      });
+      io.to(streamId).emit("new-producer", {
+        producerId: audioProducer.id,
+        kind: 'audio',
+        socketId: 'server-ingest',
+      });
+
+      // 3. Spawning FFmpeg to pull from RTMP and push to Mediasoup
+      const rtmpUrl = `rtmp://rtmp:1935/live/${streamKey}`;
+      
+      const ffmpegProcess = ffmpeg(rtmpUrl)
+        .inputOptions([
+          '-re'
+        ])
+        .outputOptions([
+          '-map 0:v:0',
+          '-c:v copy',
+          '-f rtp',
+          '-payload_type 101',
+          '-ssrc 11111111',
+          `rtp://${transport.tuple.localIp}:${transport.tuple.localPort}`,
+          '-map 0:a:0',
+          '-c:a libopus',
+          '-b:a 128k',
+          '-ac 2',
+          '-ar 48000',
+          '-f rtp',
+          '-payload_type 100',
+          '-ssrc 22222222',
+          `rtp://${transport.tuple.localIp}:${transport.rtcpTuple?.localPort || 5005}`
+        ]);
+
+      ffmpegProcess.on('start', () => {
+        console.log(`[Ingest] FFmpeg bridge active for ${streamId}`);
+      });
+
+      ffmpegProcess.on('error', (err) => {
+        console.error(`[Ingest] FFmpeg bridge error: ${err.message}`);
+      });
+
+      this.ingests.set(streamId, {
+        process: ffmpegProcess,
+        videoProducer,
+        audioProducer,
+        transport
+      });
+      
+      ffmpegProcess.run();
+
+    } catch (error) {
+      console.error(`[Ingest] Failed to start bridge: ${error}`);
+    }
+  }
+
+  stopIngestBridge(streamId: string) {
+    const ingest = this.ingests.get(streamId);
+    if (ingest) {
+      ingest.process.kill('SIGINT');
+      ingest.videoProducer.close();
+      ingest.audioProducer.close();
+      ingest.transport.close();
+      this.ingests.delete(streamId);
+      console.log(`[Ingest] Bridge stopped for stream ${streamId}`);
+    }
+  }
+}
+
+const ingestManager = new IngestManager();
 
 // ============================================
 // SWANI AI WRAPPER (Enhanced)
@@ -1504,6 +1644,53 @@ app.put("/api/users/:userId/stream-keys", async (req, res) => {
   }
 });
 
+// RTMP Webhook: on_publish
+app.post("/api/rtmp/on-publish", async (req, res) => {
+  const { name: streamKey } = req.body;
+  
+  try {
+    // Find the stream by key
+    const stream = await prisma.stream.findFirst({
+      where: { streamKey: streamKey, status: "LIVE" }
+    });
+
+    if (!stream) {
+      console.warn(`[RTMP] Rejecting publish: No active stream found for key ${streamKey}`);
+      return res.status(404).json({ error: "Stream not found" });
+    }
+
+    console.log(`[RTMP] Ingest detected for stream ${stream.id}. Bridging to WebRTC.`);
+    
+    // Trigger the WebRTC bridge
+    await ingestManager.startIngestBridge(stream.id, streamKey);
+
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error("[RTMP] Error in on-publish:", error);
+    res.status(500).send("Error");
+  }
+});
+
+app.post("/api/rtmp/on-publish-done", async (req, res) => {
+  const { name: streamKey } = req.body;
+  
+  try {
+    const stream = await prisma.stream.findFirst({
+      where: { streamKey: streamKey }
+    });
+
+    if (stream) {
+      console.log(`[RTMP] Stream stopped for key ${streamKey}. Stopping bridge.`);
+      ingestManager.stopIngestBridge(stream.id);
+    }
+
+    res.status(200).send("OK");
+  } catch (error) {
+    console.error("[RTMP] Error in on-publish-done:", error);
+    res.status(500).send("Error");
+  }
+});
+
 // ============================================
 // CREATOR MONETIZATION (STRIPE & MUX)
 // ============================================
@@ -1802,11 +1989,15 @@ io.on("connection", (socket) => {
 
         callback({ producerId: producer.id });
 
+        const isHostProducer = await prisma.stream.findFirst({
+          where: { id: streamId, creator: { clerkId: socket.handshake.auth.userId } }
+        });
+
         // Notify all clients in the room about the new producer
         socket.to(streamId).emit("new-producer", {
           producerId: producer.id,
           kind,
-          socketId: socket.id,
+          socketId: isHostProducer ? 'host' : socket.id,
         });
       } catch (error: any) {
         console.error("[Socket] Error producing:", error);

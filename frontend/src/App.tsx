@@ -447,6 +447,7 @@ const GoldBoardGrid: React.FC<{
   onJoinAsGuest: () => void;
   onLeaveAsGuest: () => void;
   currentGuestId?: string;
+  hostRemoteStream?: MediaStream | null;
 }> = ({ 
   streamId, 
   isHost, 
@@ -455,16 +456,21 @@ const GoldBoardGrid: React.FC<{
   guests, 
   onJoinAsGuest,
   onLeaveAsGuest,
-  currentGuestId 
+  currentGuestId,
+  hostRemoteStream
 }) => {
   const hostVideoRef = useRef<HTMLVideoElement>(null);
   const guestVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
 
   useEffect(() => {
-    if (hostVideoRef.current && localStream) {
-      hostVideoRef.current.srcObject = localStream;
+    if (hostVideoRef.current) {
+      if (isHost && localStream) {
+        hostVideoRef.current.srcObject = localStream;
+      } else if (!isHost && hostRemoteStream) {
+        hostVideoRef.current.srcObject = hostRemoteStream;
+      }
     }
-  }, [localStream]);
+  }, [localStream, hostRemoteStream, isHost]);
 
   const setGuestVideoRef = (guestId: string, el: HTMLVideoElement | null) => {
     if (el) {
@@ -702,6 +708,7 @@ const StreamView: React.FC<{
   socket: Socket;
 }> = ({ streamId, userId, isHost, socket }) => {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [hostRemoteStream, setHostRemoteStream] = useState<MediaStream | null>(null);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [paymentHandles, setPaymentHandles] = useState<PaymentHandle>({});
@@ -787,9 +794,9 @@ const StreamView: React.FC<{
     });
 
     socket.on('new-producer', async ({ producerId, kind, socketId }: any) => {
-      console.log('[Socket] New producer:', producerId, kind);
+      console.log('[Socket] New producer:', producerId, kind, 'from:', socketId);
       // Create consumer for the new producer
-      await createConsumer(producerId);
+      await createConsumer(producerId, socketId);
     });
 
     return () => {
@@ -869,7 +876,7 @@ const StreamView: React.FC<{
   };
 
   // Create consumer for receiving
-  const createConsumer = async (producerId: string) => {
+  const createConsumer = async (producerId: string, producerSocketId?: string) => {
     if (!device) return;
 
     try {
@@ -925,9 +932,20 @@ const StreamView: React.FC<{
           // Add track to appropriate video element
           const stream = new MediaStream([consumer.track]);
           
-          // Find the guest video element and set the stream
-          // This is simplified - in production you'd track which producer belongs to which guest
-          console.log('[Mediasoup] Consuming stream from producer:', producerId);
+          if (producerSocketId === 'server-ingest' || (!isHost && producerSocketId === 'host')) {
+            console.log('[Mediasoup] Setting host stream');
+            setHostRemoteStream((prev) => {
+               if (!prev) return stream;
+               // Add track to existing stream if it's already created (e.g. video added to audio)
+               const newStream = new MediaStream(prev.getTracks());
+               newStream.addTrack(consumer.track);
+               return newStream;
+            });
+          } else {
+             // For guests, we would update the guests state with the track
+             // (Logic for guest track assignment omitted for brevity but standard in SFUs)
+             console.log('[Mediasoup] Consuming stream from guest producer:', producerId);
+          }
         }
       );
 
@@ -1004,6 +1022,7 @@ const StreamView: React.FC<{
           isHost={isHost}
           userId={userId}
           localStream={localStream}
+          hostRemoteStream={hostRemoteStream}
           guests={guests}
           onJoinAsGuest={handleJoinAsGuest}
           onLeaveAsGuest={handleLeaveAsGuest}
