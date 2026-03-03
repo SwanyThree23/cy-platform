@@ -171,7 +171,8 @@ const MarketplaceView: React.FC<{
           userId,
           ...uploadData,
           videoUrl: `https://stream.mux.com/${uploadId}/high.mp4`,
-          thumbnailUrl: `https://image.mux.com/${uploadId}/thumbnail.jpg`
+          thumbnailUrl: `https://image.mux.com/${uploadId}/thumbnail.jpg`,
+          muxAssetId: uploadId
         }),
       });
 
