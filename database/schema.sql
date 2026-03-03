@@ -523,4 +523,59 @@ CREATE TABLE watch_party_participants (
 );
 
 CREATE INDEX idx_wp_participants_party ON watch_party_participants(watch_party_id);
-CREATE INDEX idx_wp_participants_user ON watch_party_participants(user_id);
+-- ============================================
+-- TABLE: video_posts (Marketplace)
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS video_posts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(200) NOT NULL,
+    description TEXT,
+    video_url TEXT NOT NULL,
+    thumbnail_url TEXT,
+    
+    -- Marketplace Details
+    price DECIMAL(10, 2) DEFAULT 0.00,
+    currency VARCHAR(3) DEFAULT 'USD',
+    is_for_sale BOOLEAN DEFAULT TRUE,
+    
+    -- Metrics
+    views_count INTEGER DEFAULT 0,
+    likes_count INTEGER DEFAULT 0,
+    
+    -- Status
+    status VARCHAR(50) DEFAULT 'active', -- active, archived, flagged
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_video_posts_user ON video_posts(user_id);
+CREATE INDEX IF NOT EXISTS idx_video_posts_status ON video_posts(status);
+
+-- ============================================
+-- TABLE: marketplace_purchases
+-- ============================================
+
+CREATE TABLE IF NOT EXISTS marketplace_purchases (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    video_post_id UUID NOT NULL REFERENCES video_posts(id) ON DELETE CASCADE,
+    buyer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    seller_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    
+    amount DECIMAL(10, 2) NOT NULL,
+    currency VARCHAR(3) DEFAULT 'USD',
+    
+    -- Transaction Info
+    payment_method VARCHAR(50), 
+    external_transaction_id VARCHAR(255),
+    status VARCHAR(50) DEFAULT 'completed',
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_purchases_video ON marketplace_purchases(video_post_id);
+CREATE INDEX IF NOT EXISTS idx_purchases_buyer ON marketplace_purchases(buyer_id);
+CREATE INDEX IF NOT EXISTS idx_purchases_seller ON marketplace_purchases(seller_id);
+

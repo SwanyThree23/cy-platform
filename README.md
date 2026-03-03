@@ -1,6 +1,7 @@
 # CY Platform - Gold Board Grid Live Streaming
 
-**Zero-Fee Payments • 20-Guest Panels • Cross-Platform Streaming**
+### Zero-Fee Payments • 20-Guest Panels • Cross-Platform Streaming
+
 
 A production-grade live streaming platform featuring the Gold Board Grid layout with host top-left positioning, vertically scrollable guest panels, and direct payment integration with 0% platform fees.
 
@@ -11,6 +12,7 @@ A production-grade live streaming platform featuring the Gold Board Grid layout 
 ## 🎯 Key Features
 
 ### Gold Board Grid Layout
+
 - **Host Panel**: Pinned at top-left with gold border
 - **20 Guest Slots**: Vertically scrollable grid
 - **Always Visible Host**: Host remains visible while scrolling guests
@@ -39,6 +41,13 @@ A production-grade live streaming platform featuring the Gold Board Grid layout 
 - **Multi-language**: Supports global audiences
 - **Smart Actions**: Allow, flag, or delete automatically
 - **Content Filtering**: Spam, hate speech, explicit content
+
+### Marketplace & Video Posts
+- **Video Storage**: Upload and share pre-recorded content
+- **Direct Sales**: Sell videos directly to fans with 0% fee
+- **Engagement**: View counts, likes, and creator attribution
+- **Seamless Flow**: Integrated into the main Gold Board Grid experience
+
 
 ## 🚀 Quick Start
 
@@ -179,6 +188,14 @@ PUT    /api/users/:id/payment-handles
 PUT    /api/users/:id/stream-keys
 ```
 
+### Marketplace
+```
+GET    /api/marketplace               # List all video posts
+POST   /api/marketplace               # Create a new video post
+POST   /api/marketplace/purchase      # Record a video purchase
+```
+
+
 ## 🔐 Security Features
 
 - ✅ **Encrypted Stream Keys**: AES-256 encryption
@@ -245,9 +262,20 @@ const paymentMethods = [
 ];
 ```
 
-## 🐛 Troubleshooting
-
+## 🐛 Troubleshooting & Live Access
+ 
+### Quick Diagnostics
+ 
+If your site is not loading on the live IP, run the diagnostic script on your VPS:
+ 
+```bash
+chmod +x scripts/diagnose.sh
+./scripts/diagnose.sh
+```
+ 
 ### WebRTC Connection Issues
+
+
 ```bash
 # Check firewall
 sudo ufw allow 10000:10100/udp

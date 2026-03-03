@@ -10,6 +10,8 @@ RUN npm install --legacy-peer-deps
 COPY . .
 
 # Build production app
+ARG REACT_APP_API_URL
+ENV REACT_APP_API_URL=$REACT_APP_API_URL
 ENV CI=false
 ENV GENERATE_SOURCEMAP=false
 ENV NODE_OPTIONS="--max-old-space-size=2048"

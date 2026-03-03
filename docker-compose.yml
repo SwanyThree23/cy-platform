@@ -1,5 +1,4 @@
-version: "3.8"
-
+# CY Platform - Docker Configuration for Live Access
 services:
   # ============================================
   # PostgreSQL Database
@@ -23,6 +22,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: always
 
   # ============================================
   # Redis (for session management & caching)
@@ -37,6 +37,7 @@ services:
     command: redis-server --appendonly yes
     volumes:
       - redis_data:/data
+    restart: always
 
   # ============================================
   # Backend API Server
@@ -71,6 +72,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
+    restart: always
 
   # ============================================
   # RTMP Server (Node Media Server)
@@ -85,6 +87,7 @@ services:
       - cy-network
     volumes:
       - ./rtmp/nginx.conf:/etc/nginx/nginx.conf
+    restart: always
 
   # ============================================
   # Frontend React App
@@ -93,15 +96,19 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:3001}
     container_name: cy-frontend
     environment:
       REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:3001}
+
     ports:
       - "3000:3000"
     networks:
       - cy-network
     depends_on:
       - backend
+    restart: always
 
   # ============================================
   # Nginx Reverse Proxy
@@ -121,6 +128,7 @@ services:
       - backend
       - frontend
       - rtmp
+    restart: always
 
 volumes:
   postgres_data:

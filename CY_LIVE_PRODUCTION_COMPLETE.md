@@ -3,12 +3,12 @@
 ## Executive Summary
 
 CY Platform is a production-grade live streaming solution featuring:
-- **Gold Board Grid UI** with host top-left gold border, vertically scrollable with 20 guest panels
-- **Zero-Fee Payment System** - Direct payments via PayPal, Cash App, Venmo, Zelle, Chime (0% platform cut)
-- **Cross-Platform Streaming** - Simultaneous broadcast to Instagram, TikTok, Facebook, YouTube via RTMP
-- **Mediasoup WebRTC SFU** - Support for 20+ guests with real-time video/audio
-- **SWANI AI Moderation** - Automated content moderation using LLM
-- **90/10 Revenue Split** - Creators keep 90%, platform takes 10% only from premium features
+- **Gold Board Grid UI**: Pinned host top-left with neon gold border glow, scrollable 20-guest grid.
+- **Premium Marketplace**: Glassmorphic UI with real-time trading stats, automated video sales.
+- **Zero-Fee Infrastructure**: Direct creator payments (0% platform cut) for maximum profitability.
+- **Hybrid Streaming**: Mediasoup WebRTC for zero-latency panels + RTMP Fan-out for global reach.
+- **Swani AI Core**: Real-time moderation and content analysis.
+
 
 ## Key Integrations Achieved
 
@@ -144,8 +144,14 @@ cy-platform/
 - `remove-guest` / `guest-removed`
 - `payment-sent` / `payment-notification`
 
+### Marketplace
+- `upload-video` / `video-published`
+- `purchase-item` / `purchase-completed`
+- `like-video` / `like-updated`
+
 ### Watch Party
 - `sync-watch-party` / `watch-party-sync`
+
 
 ## Security Features
 

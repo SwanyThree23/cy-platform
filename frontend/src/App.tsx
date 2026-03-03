@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Device } from 'mediasoup-client';
 import { io, Socket } from 'socket.io-client';
 import './App.css';
@@ -45,6 +45,191 @@ interface PaymentHandle {
   zelle?: string;
   chime?: string;
 }
+
+interface VideoPost {
+  id: string;
+  user_id: string;
+  title: string;
+  description?: string;
+  video_url: string;
+  thumbnail_url?: string;
+  price: number;
+  currency: string;
+  is_for_sale: boolean;
+  views_count: number;
+  likes_count: number;
+  author?: {
+    username: string;
+    display_name: string;
+    avatar_url?: string;
+  };
+  created_at: string;
+}
+
+// ============================================
+// MARKETPLACE VIEW COMPONENT
+// ============================================
+
+const MarketplaceView: React.FC<{
+  userId: string;
+  onBack: () => void;
+}> = ({ userId, onBack }) => {
+  const [posts, setPosts] = useState<VideoPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadData, setUploadData] = useState({
+    title: '',
+    description: '',
+    price: 0,
+    isForSale: true
+  });
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const fetchPosts = async () => {
+    try {
+      const response = await fetch('/api/marketplace');
+      const data = await response.json();
+      setPosts(data);
+    } catch (error) {
+      console.error('Failed to fetch marketplace:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsUploading(true);
+    
+    try {
+      // In a real app, you'd upload the video file to Supabase Storage first
+      // For this demo, we'll use a placeholder video URL
+      const response = await fetch('/api/marketplace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          ...uploadData,
+          videoUrl: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4',
+          thumbnailUrl: 'https://via.placeholder.com/300x169/daa520/0a0a0a?text=CY+Platform+Video'
+        }),
+      });
+
+      if (response.ok) {
+        setUploadData({ title: '', description: '', price: 0, isForSale: true });
+        fetchPosts();
+        alert('Video uploaded successfully!');
+      }
+    } catch (error) {
+      console.error('Upload failed:', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="marketplace-view">
+      <header className="marketplace-header glass-effect">
+        <button className="back-btn" onClick={onBack}>← Back</button>
+        <h2 className="glow-text">CY Marketplace</h2>
+        <div className="marketplace-stats-bar">
+          <div className="stat-item">
+            <span className="stat-value">{posts.length}</span>
+            <span className="stat-label">Videos</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-value">$0.00</span>
+            <span className="stat-label">Platform Fees</span>
+          </div>
+          <div className="stat-item">
+            <span className="stat-value pulse">LIVE</span>
+            <span className="stat-label">Trading</span>
+          </div>
+        </div>
+      </header>
+
+
+      <div className="marketplace-content">
+        <aside className="upload-sidebar gold-border">
+          <h3>Upload Video Post</h3>
+          <p>Sell your content or share for free</p>
+          <form className="upload-form" onSubmit={handleUpload}>
+            <div className="input-field">
+              <label htmlFor="post-title">Video Title</label>
+              <input 
+                id="post-title"
+                type="text" 
+                placeholder="Enter a catchy title" 
+                className="chat-input" 
+                value={uploadData.title}
+                onChange={e => setUploadData({...uploadData, title: e.target.value})}
+                required 
+              />
+            </div>
+            <div className="input-field">
+              <label htmlFor="post-desc">Description</label>
+              <textarea 
+                id="post-desc"
+                placeholder="Tell viewers about your video" 
+                className="chat-input" 
+                value={uploadData.description}
+                onChange={e => setUploadData({...uploadData, description: e.target.value})}
+              />
+            </div>
+
+            <div className="price-input-group">
+              <label htmlFor="post-price">Price ($)</label>
+              <input 
+                id="post-price"
+                type="number" 
+                className="chat-input" 
+                value={uploadData.price}
+                onChange={e => setUploadData({...uploadData, price: parseFloat(e.target.value)})}
+                step="0.01" 
+              />
+            </div>
+            <button type="submit" className="host-btn" disabled={isUploading}>
+              {isUploading ? 'Uploading...' : 'Post Video'}
+            </button>
+          </form>
+        </aside>
+
+        <main className="posts-grid">
+          {loading ? (
+            <div className="loading">Loading marketplace...</div>
+          ) : (
+            posts.map(post => (
+              <div key={post.id} className="post-card gold-border">
+                <div className="post-thumbnail">
+                  <img src={post.thumbnail_url} alt={post.title} />
+                  {post.price > 0 && <span className="price-tag">${post.price}</span>}
+                  <button className="play-overlay">▶</button>
+                </div>
+                <div className="post-info">
+                  <h4>{post.title}</h4>
+                  <p className="post-author">By {post.author?.display_name || post.user_id}</p>
+                  <div className="post-actions">
+                    <button className="like-btn">❤️ {post.likes_count}</button>
+                    <button className="buy-btn">BUY NOW</button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+          {posts.length === 0 && !loading && (
+            <div className="no-posts">
+              <p>No videos found in the marketplace. Be the first to upload!</p>
+            </div>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+};
+
 
 // ============================================
 // GOLD BOARD GRID COMPONENT
@@ -319,9 +504,12 @@ const StreamView: React.FC<{
   const [paymentHandles, setPaymentHandles] = useState<PaymentHandle>({});
   const [streamInfo, setStreamInfo] = useState<Stream | null>(null);
   const [currentGuestId, setCurrentGuestId] = useState<string>();
+
+  // Mediasoup state
+  // @ts-ignore
   const [device, setDevice] = useState<Device | null>(null);
-  const [sendTransport, setSendTransport] = useState<any>(null);
-  const [recvTransports, setRecvTransports] = useState<Map<string, any>>(new Map());
+  const [producers, setProducers] = useState<Map<string, any>>(new Map());
+  const [consumers, setConsumers] = useState<Map<string, any>>(new Map());
 
   // Initialize Mediasoup device
   useEffect(() => {
@@ -796,6 +984,7 @@ const App: React.FC = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [activeStreamId, setActiveStreamId] = useState<string | null>(null);
   const [activePartyId, setActivePartyId] = useState<string | null>(null);
+  const [showMarketplace, setShowMarketplace] = useState(false);
   const [isHost, setIsHost] = useState(false);
   const [userId] = useState(() => `user-${Math.random().toString(36).substr(2, 9)}`);
 
@@ -818,12 +1007,14 @@ const App: React.FC = () => {
   const handleJoinStream = (streamId: string) => {
     setActiveStreamId(streamId);
     setActivePartyId(null);
+    setShowMarketplace(false);
     setIsHost(false);
   };
 
   const handleJoinParty = (partyId: string) => {
     setActivePartyId(partyId);
     setActiveStreamId(null);
+    setShowMarketplace(false);
     setIsHost(false);
   };
 
@@ -831,8 +1022,13 @@ const App: React.FC = () => {
     const newId = `party-${Math.random().toString(36).substr(2, 6)}`;
     setActivePartyId(newId);
     setActiveStreamId(null);
+    setShowMarketplace(false);
     setIsHost(true);
   };
+
+  if (showMarketplace) {
+    return <MarketplaceView userId={userId} onBack={() => setShowMarketplace(false)} />;
+  }
 
   return (
     <div className="app">
@@ -841,7 +1037,16 @@ const App: React.FC = () => {
           <header className="app-header">
             <h1 className="app-logo">CY Platform</h1>
             <p className="app-tagline">Zero-Fee Live Streaming • 20-Guest Panels • AI Watch Parties</p>
+            <div className="header-nav">
+              <button 
+                className="marketplace-nav-btn gold-border"
+                onClick={() => setShowMarketplace(true)}
+              >
+                🛍️ VISIT MARKETPLACE
+              </button>
+            </div>
           </header>
+
 
           <div className="stream-browser">
             <div className="main-sections">
