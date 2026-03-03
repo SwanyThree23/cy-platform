@@ -11,7 +11,7 @@ import { EventEmitter } from "events";
 import * as crypto from "node:crypto";
 import dotenv from "dotenv";
 import prisma from "./prisma";
-import { authMiddleware } from "./auth";
+import { authMiddleware, requireAuth } from "./auth";
 
 dotenv.config();
 
@@ -1420,6 +1420,41 @@ app.put("/api/users/:userId/stream-keys", async (req, res) => {
   } catch (error: any) {
     console.error("Error updating stream key:", error);
     res.status(500).json({ error: "Failed to update stream key" });
+  }
+});
+
+// ============================================
+// CREATOR MONETIZATION (STRIPE & MUX)
+// ============================================
+
+// Stripe Connect - Create Account Link
+app.post("/api/creators/onboard", requireAuth, async (req: any, res: any) => {
+  try {
+    const creatorId = req.creator.id;
+    
+    // In a real app, use stripe.accounts.create({...})
+    // and stripe.accountLinks.create({...})
+    
+    res.json({
+      url: "https://connect.stripe.com/express/demo",
+      success: true
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to create Stripe onboarding link" });
+  }
+});
+
+// Mux - Create Asset/Upload URL
+app.post("/api/creators/upload-url", requireAuth, async (req: any, res: any) => {
+  try {
+    // In a real app, use Mux.Video.Uploads.create({...})
+    
+    res.json({
+      uploadUrl: "https://mux-demo-upload.com/session-123",
+      id: "mux-asset-mock-123"
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to create Mux upload URL" });
   }
 });
 
