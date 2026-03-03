@@ -9,6 +9,9 @@ RUN npm install --legacy-peer-deps && npm install -g typescript
 # Copy source code
 COPY . .
 
+# Generate Prisma Client
+RUN npx prisma generate
+
 # Build TypeScript
 RUN npm run build
 
