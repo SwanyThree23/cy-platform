@@ -116,8 +116,45 @@ model Stream {
   peakViewers         Int          @default(0)
   totalViewers        Int          @default(0)
   totalMessages       Int          @default(0)
-  totalSuperChat      Float        @default(0.0) // Kept as float for super chat totals
+  totalSuperChat      Float        @default(0.0)
 
   createdAt           DateTime     @default(now())
   updatedAt           DateTime     @updatedAt
+}
+
+model WatchParty {
+  id                  String    @id @default(uuid())
+  hostId              String
+  creator             Creator   @relation(fields: [hostId], references: [id], onDelete: Cascade)
+  
+  title               String
+  description         String?
+  videoUrl            String
+  videoSource         String    @default("youtube")
+  videoId             String
+  inviteCode          String    @unique
+  visibility          Visibility @default(PUBLIC)
+  status              String     @default("active")
+  
+  currentTimeSeconds  Int        @default(0)
+  isPlaying           Boolean    @default(false)
+  
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  
+  participants        WatchPartyParticipant[]
+}
+
+model WatchPartyParticipant {
+  id                  String     @id @default(uuid())
+  watchPartyId        String
+  watchParty          WatchParty @relation(fields: [watchPartyId], references: [id], onDelete: Cascade)
+  userId              String     // Can be a creator or viewer clerkId
+  status              String     @default("connected")
+  isReady             Boolean    @default(false)
+  
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  @@unique([watchPartyId, userId])
 }
