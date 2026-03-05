@@ -41,52 +41,52 @@ enum Visibility {
 
 model Creator {
   id                  String    @id @default(uuid())
-  clerkId             String    @unique // Clark ID
+  clerkId             String    @unique @map("clerk_id")
   email               String    @unique
   handle              String    @unique // Unique @ slug
-  displayName         String?
-  avatarUrl           String?
+  displayName         String?   @map("display_name")
+  avatarUrl           String?   @map("avatar_url")
   bio                 String?
   category            Category?
   
   // Subscription / Plan
   plan                Plan      @default(FREE)
-  planStatus          String?
-  planPeriodEnd       DateTime?
-  subscriptionId      String?
+  planStatus          String?   @map("plan_status")
+  planPeriodEnd       DateTime? @map("plan_period_end")
+  subscriptionId      String?   @map("subscription_id")
   
   // Stripe Connect & Payments
-  stripeCustomerId    String?
-  stripeAccountId     String?
-  stripeAccountStatus String?
+  stripeCustomerId    String?   @map("stripe_customer_id")
+  stripeAccountId     String?   @map("stripe_account_id")
+  stripeAccountStatus String?   @map("stripe_account_status")
   
   // Streaming (Custom RTMP & Mux)
-  rtmpKey             String?   @unique
-  rtmpSecret          String?   // Unique RTMP secret
-  muxLiveStreamId     String?
-  muxStreamKey        String?
-  muxAssetId          String?
+  rtmpKey             String?   @unique @map("rtmp_key")
+  rtmpSecret          String?   @map("rtmp_secret")
+  muxLiveStreamId     String?   @map("mux_live_stream_id")
+  muxStreamKey        String?   @map("mux_stream_key")
+  muxAssetId          String?   @map("mux_asset_id")
   
   // AI (Aura)
-  auraEnabled         Boolean   @default(false)
-  auraVoice           String    @default("onyx")
-  auraAutoSummary     Boolean   @default(false)
+  auraEnabled         Boolean   @default(false) @map("aura_enabled")
+  auraVoice           String    @default("onyx") @map("aura_voice")
+  auraAutoSummary     Boolean   @default(false) @map("aura_auto_summary")
   
   // Payment Handles (Zero-Fee System)
-  paypalHandle        String?
-  cashappHandle       String?
-  venmoHandle         String?
-  zelleHandle         String?
-  chimeHandle         String?
+  paypalHandle        String?   @map("paypal_handle")
+  cashappHandle       String?   @map("cashapp_handle")
+  venmoHandle         String?   @map("venmo_handle")
+  zelleHandle         String?   @map("zelle_handle")
+  chimeHandle         String?   @map("chime_handle")
   
   // Cross-Platform Streaming Keys (Encrypted)
-  instagramStreamKey  String?
-  tiktokStreamKey     String?
-  facebookStreamKey   String?
-  youtubeStreamKey    String?
+  instagramStreamKey  String?   @map("instagram_stream_key")
+  tiktokStreamKey     String?   @map("tiktok_stream_key")
+  facebookStreamKey   String?   @map("facebook_stream_key")
+  youtubeStreamKey    String?   @map("youtube_stream_key")
 
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
   
   // Relations
   streams             Stream[]
@@ -95,41 +95,45 @@ model Creator {
   paymentsReceived    Payment[]      @relation("RecipientPayments")
   subscriptions       Subscription[]
   follows             Follow[]       @relation("Following")
+
+  @@map("creators")
 }
 
 model Stream {
   id                  String    @id @default(uuid())
-  creatorId           String
+  creatorId           String    @map("creator_id")
   creator             Creator   @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   
   title               String
   description         String?
   category            Category?
-  thumbnailUrl        String?
+  thumbnailUrl        String?   @map("thumbnail_url")
   
   status              StreamStatus @default(SCHEDULED)
   visibility          Visibility   @default(PUBLIC)
-  streamKey           String       @default(uuid()) // Internal key for RTMP coordination
+  streamKey           String       @default(uuid()) @map("stream_key")
   
   // Timestamps
-  scheduledAt         DateTime?
-  startedAt           DateTime?
-  endedAt             DateTime?
-  durationSeconds     Int          @default(0)
+  scheduledAt         DateTime?    @map("scheduled_at")
+  startedAt           DateTime?    @map("started_at")
+  endedAt             DateTime?    @map("ended_at")
+  durationSeconds     Int          @default(0) @map("duration_seconds")
   
   // Analytics / Metrics
-  peakViewers         Int          @default(0)
-  totalViewers        Int          @default(0)
-  totalMessages       Int          @default(0)
-  totalSuperChat      Float        @default(0.0)
+  peakViewers         Int          @default(0) @map("peak_viewers")
+  totalViewers        Int          @default(0) @map("total_viewers")
+  totalMessages       Int          @default(0) @map("total_messages")
+  totalSuperChat      Float        @default(0.0) @map("total_super_chat")
 
-  createdAt           DateTime     @default(now())
-  updatedAt           DateTime     @updatedAt
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
 
   guests              StreamGuest[]
   relays              RtmpRelay[]
   chatMessages        ChatMessage[]
   payments            Payment[]
+
+  @@map("streams")
 }
 
 model RtmpRelay {

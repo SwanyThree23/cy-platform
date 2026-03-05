@@ -24,21 +24,9 @@ fi
 echo "Rebuilding and starting services (this takes a few minutes)..."
 docker-compose up -d --build
 
-# 5. INITIALIZE DATABASE (Run once or safely)
+# 5. INITIALIZE DATABASE (Prisma)
 echo "Ensuring database schema is up-to-date..."
-# Wait for postgres to be ready
-until docker-compose exec -T postgres pg_isready -U cyuser -d cyplatform; do
-  echo "Waiting for PostgreSQL to be ready..."
-  sleep 2
-done
-
-# Run the schema script
-docker-compose exec -T postgres psql -U cyuser -d cyplatform < database/schema.sql
-
-# 6. SETUP SSL (Let's Encrypt - Optional but Recommended)
-# To use this, you must have your domain pointing to this IP
-# sudo apt install certbot -y
-# sudo certbot certonly --standalone -d your-domain.com
+docker-compose exec -T backend npx prisma db push --accept-data-loss
 
 echo "Deployment complete!"
 echo "Check logs with: docker-compose logs -f backend"
