@@ -26,9 +26,12 @@ const HOST = process.env.HOST || "0.0.0.0";
 const NODE_ENV = process.env.NODE_ENV || "development";
 
 // SDK Initializations
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "sk_test_placeholder", {
-  apiVersion: "2023-10-16" as any,
-});
+const stripe = new Stripe(
+  process.env.STRIPE_SECRET_KEY || "sk_test_placeholder",
+  {
+    apiVersion: "2023-10-16" as any,
+  },
+);
 
 const mux = new Mux({
   tokenId: process.env.MUX_TOKEN_ID || "placeholder",
@@ -141,6 +144,24 @@ app.use(
     credentials: true,
   }),
 );
+
+// Health Check
+app.get("/api/health", async (req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({
+      status: "healthy",
+      timestamp: new Date().toISOString(),
+      services: {
+        database: "connected",
+        mediasoup:
+          mediasoupManager.getWorkers().length > 0 ? "running" : "initializing",
+      },
+    });
+  } catch (err: any) {
+    res.status(500).json({ status: "degraded", error: err.message });
+  }
+});
 // ============================================
 // WEBHOOKS (Raw Body Required)
 // ============================================
@@ -157,7 +178,7 @@ app.post(
       event = stripe.webhooks.constructEvent(
         req.body,
         sig,
-        process.env.STRIPE_WEBHOOK_SECRET || ""
+        process.env.STRIPE_WEBHOOK_SECRET || "",
       );
     } catch (err: any) {
       return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -180,13 +201,15 @@ app.post(
             stripeSessionId: session.id,
           },
         });
-        
-        console.log(`[Stripe] Purchase confirmed for post ${metadata.videoPostId}`);
+
+        console.log(
+          `[Stripe] Purchase confirmed for post ${metadata.videoPostId}`,
+        );
       }
     }
 
     res.json({ received: true });
-  }
+  },
 );
 
 // Mux Webhook
@@ -233,23 +256,27 @@ const ensureCreator = async (req: any, res: any, next: any) => {
   if (auth?.userId) {
     try {
       let creator = await prisma.creator.findUnique({
-        where: { clerkId: auth.userId }
+        where: { clerkId: auth.userId },
       });
 
       if (!creator) {
         // Auto-provision creator
         // Clerk session typically includes email in sessionClaims or userEmail
-        const email = auth.sessionClaims?.email || auth.userEmail || `user_${auth.userId}@temporary.com`;
-        const handle = email.split('@')[0].toLowerCase() + Math.floor(Math.random() * 1000);
-        
+        const email =
+          auth.sessionClaims?.email ||
+          auth.userEmail ||
+          `user_${auth.userId}@temporary.com`;
+        const handle =
+          email.split("@")[0].toLowerCase() + Math.floor(Math.random() * 1000);
+
         creator = await prisma.creator.create({
           data: {
             clerkId: auth.userId,
             email: email,
             handle: handle,
             displayName: handle.toUpperCase(),
-            plan: 'FREE'
-          }
+            plan: "FREE",
+          },
         });
         console.log(`[Auth] Auto-provisioned creator: ${handle}`);
       }
@@ -272,7 +299,8 @@ class MediasoupManager extends EventEmitter {
   public transports: Map<string, mediasoup.types.WebRtcTransport> = new Map();
   public producers: Map<string, mediasoup.types.Producer> = new Map();
   public consumers: Map<string, mediasoup.types.Consumer> = new Map();
-  public plainTransports: Map<string, mediasoup.types.PlainTransport> = new Map();
+  public plainTransports: Map<string, mediasoup.types.PlainTransport> =
+    new Map();
   private nextWorkerIndex = 0;
 
   async initialize(numWorkers = 2) {
@@ -358,13 +386,16 @@ class MediasoupManager extends EventEmitter {
     const router = await this.createRouter(roomId);
 
     const transport = await router.createPlainTransport({
-      listenIp: { ip: "0.0.0.0", announcedIp: process.env.MEDIASOUP_ANNOUNCED_IP || "127.0.0.1" },
+      listenIp: {
+        ip: "0.0.0.0",
+        announcedIp: process.env.MEDIASOUP_ANNOUNCED_IP || "127.0.0.1",
+      },
       rtcpMux: false,
       comedia: true,
     });
 
     this.plainTransports.set(`${roomId}:plain`, transport);
-    
+
     console.log(`[Mediasoup] Plain RTP Transport created for room: ${roomId}`);
     return transport;
   }
@@ -528,7 +559,7 @@ class RTMPFanOutManager extends EventEmitter {
     // Get creator's encrypted stream key for this platform
     const stream = await prisma.stream.findUnique({
       where: { id: streamId },
-      include: { creator: true }
+      include: { creator: true },
     });
 
     if (!stream || !stream.creator) {
@@ -608,7 +639,8 @@ class RTMPFanOutManager extends EventEmitter {
   private decryptStreamKey(encryptedKey: string): string {
     try {
       // In production, use a real encryption key from environment
-      const ENCRYPTION_KEY = process.env.STREAM_ENCRYPTION_KEY || "fallback_secret";
+      const ENCRYPTION_KEY =
+        process.env.STREAM_ENCRYPTION_KEY || "fallback_secret";
       const decipher = crypto.createDecipher("aes-256-cbc", ENCRYPTION_KEY);
       let decrypted = decipher.update(encryptedKey, "hex", "utf8");
       decrypted += decipher.final("utf8");
@@ -708,13 +740,16 @@ class IngestManager extends EventEmitter {
 
   async startIngestBridge(streamId: string, streamKey: string) {
     console.log(`[Ingest] Starting bridge for stream ${streamId}`);
-    
+
     try {
       const router = await mediasoupManager.createRouter(streamId);
-      
+
       // 1. Create a PlainRtpTransport for the stream
       const transport = await router.createPlainTransport({
-        listenIp: { ip: "0.0.0.0", announcedIp: process.env.MEDIASOUP_ANNOUNCED_IP || "127.0.0.1" },
+        listenIp: {
+          ip: "0.0.0.0",
+          announcedIp: process.env.MEDIASOUP_ANNOUNCED_IP || "127.0.0.1",
+        },
         rtcpMux: false,
         comedia: true,
       });
@@ -722,73 +757,78 @@ class IngestManager extends EventEmitter {
       // 2. Create Producers for Video and Audio
       // We manually define RTP parameters that FFmpeg will follow
       const videoProducer = await transport.produce({
-        kind: 'video',
+        kind: "video",
         rtpParameters: {
-          codecs: [{
-            mimeType: 'video/H264',
-            clockRate: 90000,
-            payloadType: 101,
-            parameters: { 'packetization-mode': 1, 'profile-level-id': '4d0032' }
-          }],
-          encodings: [{ ssrc: 11111111 }]
-        }
+          codecs: [
+            {
+              mimeType: "video/H264",
+              clockRate: 90000,
+              payloadType: 101,
+              parameters: {
+                "packetization-mode": 1,
+                "profile-level-id": "4d0032",
+              },
+            },
+          ],
+          encodings: [{ ssrc: 11111111 }],
+        },
       });
 
       const audioProducer = await transport.produce({
-        kind: 'audio',
+        kind: "audio",
         rtpParameters: {
-          codecs: [{
-            mimeType: 'audio/opus',
-            clockRate: 48000,
-            payloadType: 100,
-            channels: 2
-          }],
-          encodings: [{ ssrc: 22222222 }]
-        }
+          codecs: [
+            {
+              mimeType: "audio/opus",
+              clockRate: 48000,
+              payloadType: 100,
+              channels: 2,
+            },
+          ],
+          encodings: [{ ssrc: 22222222 }],
+        },
       });
 
       // Notify the room about the host's bridge producer
       io.to(streamId).emit("new-producer", {
         producerId: videoProducer.id,
-        kind: 'video',
-        socketId: 'server-ingest',
+        kind: "video",
+        socketId: "server-ingest",
       });
       io.to(streamId).emit("new-producer", {
         producerId: audioProducer.id,
-        kind: 'audio',
-        socketId: 'server-ingest',
+        kind: "audio",
+        socketId: "server-ingest",
       });
 
       // 3. Spawning FFmpeg to pull from RTMP and push to Mediasoup
       const rtmpUrl = `rtmp://rtmp:1935/live/${streamKey}`;
-      
+
       const ffmpegProcess = ffmpeg(rtmpUrl)
-        .inputOptions([
-          '-re'
-        ])
+        .inputOptions(["-re"])
         .outputOptions([
-          '-map 0:v:0',
-          '-c:v copy',
-          '-f rtp',
-          '-payload_type 101',
-          '-ssrc 11111111',
+          "-map 0:v:0",
+          "-c:v copy",
+          "-f rtp",
+          "-payload_type 101",
+          "-ssrc 11111111",
           `rtp://${transport.tuple.localIp}:${transport.tuple.localPort}`,
-          '-map 0:a:0',
-          '-c:a libopus',
-          '-b:a 128k',
-          '-ac 2',
-          '-ar 48000',
-          '-f rtp',
-          '-payload_type 100',
-          '-ssrc 22222222',
-          `rtp://${transport.tuple.localIp}:${transport.rtcpTuple?.localPort || 5005}`
+          "-map 0:a:0",
+          "-c:a libopus",
+          "-b:a 128k",
+          "-ac 2",
+          "-ar 48000",
+          "-f rtp",
+          "-payload_type 100",
+          "-ssrc 22222222",
+          `rtp://${transport.tuple.localIp}:${transport.rtcpTuple?.localPort || 5005}`,
         ]);
 
-      ffmpegProcess.on('start', () => {
+      ffmpegProcess.on("start", () => {
         console.log(`[Ingest] FFmpeg bridge active for ${streamId}`);
       });
 
-      ffmpegProcess.on('error', (err) => {
+      ffmpegProcess.on("error", (err) => {
         console.error(`[Ingest] FFmpeg bridge error: ${err.message}`);
       });
 
@@ -796,11 +836,10 @@ class IngestManager extends EventEmitter {
         process: ffmpegProcess,
         videoProducer,
         audioProducer,
-        transport
+        transport,
       });
-      
-      ffmpegProcess.run();
 
+      ffmpegProcess.run();
     } catch (error) {
       console.error(`[Ingest] Failed to start bridge: ${error}`);
     }
@@ -809,7 +848,7 @@ class IngestManager extends EventEmitter {
   stopIngestBridge(streamId: string) {
     const ingest = this.ingests.get(streamId);
     if (ingest) {
-      ingest.process.kill('SIGINT');
+      ingest.process.kill("SIGINT");
       ingest.videoProducer.close();
       ingest.audioProducer.close();
       ingest.transport.close();
@@ -1130,7 +1169,9 @@ class StreamManager extends EventEmitter {
         description: streamData.description,
         category: (streamData.category?.toUpperCase() as any) || "OTHER",
         visibility: (streamData.visibility?.toUpperCase() as any) || "PUBLIC",
-        scheduledAt: streamData.scheduledStart ? new Date(streamData.scheduledStart) : null,
+        scheduledAt: streamData.scheduledStart
+          ? new Date(streamData.scheduledStart)
+          : null,
         status: "SCHEDULED",
         streamKey: crypto.randomBytes(16).toString("hex"),
       },
@@ -1146,7 +1187,7 @@ class StreamManager extends EventEmitter {
         status: "LIVE",
         startedAt: new Date(),
       },
-      include: { creator: true }
+      include: { creator: true },
     });
 
     if (!stream) {
@@ -1232,15 +1273,15 @@ class StreamManager extends EventEmitter {
       await prisma.stream.update({
         where: { id: streamId },
         data: {
-          totalViewers: { increment: 1 }
-        }
+          totalViewers: { increment: 1 },
+        },
       });
 
       if (stream.viewers.size > stream.maxViewers) {
         stream.maxViewers = stream.viewers.size;
         await prisma.stream.update({
           where: { id: streamId },
-          data: { peakViewers: stream.maxViewers }
+          data: { peakViewers: stream.maxViewers },
         });
       }
     }
@@ -1264,7 +1305,9 @@ class StreamManager extends EventEmitter {
     }
 
     // Check if position is available
-    for (const [_, guestData] of (stream.guests as Map<string, any>).entries()) {
+    for (const [_, guestData] of (
+      stream.guests as Map<string, any>
+    ).entries()) {
       if (guestData.gridPosition === gridPosition) {
         throw new Error("Grid position already occupied");
       }
@@ -1284,8 +1327,8 @@ class StreamManager extends EventEmitter {
         userId: userId,
         gridPosition: gridPosition,
         status: "connected",
-        joinedAt: new Date()
-      }
+        joinedAt: new Date(),
+      },
     });
 
     this.emit("guestJoined", { streamId, guestId, userId, gridPosition });
@@ -1303,12 +1346,12 @@ class StreamManager extends EventEmitter {
         where: {
           streamId: streamId,
           userId: guest.userId,
-          status: "connected"
+          status: "connected",
         },
         data: {
           status: "disconnected",
-          leftAt: new Date()
-        }
+          leftAt: new Date(),
+        },
       });
 
       this.emit("guestLeft", { streamId, guestId, userId: guest.userId });
@@ -1624,7 +1667,8 @@ app.put("/api/users/:userId/stream-keys", async (req, res) => {
     const { userId } = req.params;
     const { platform, streamKey } = req.body;
 
-    const ENCRYPTION_KEY = process.env.STREAM_ENCRYPTION_KEY || "fallback_secret";
+    const ENCRYPTION_KEY =
+      process.env.STREAM_ENCRYPTION_KEY || "fallback_secret";
     // Encrypt the stream key
     const cipher = crypto.createCipher("aes-256-cbc", ENCRYPTION_KEY);
     let encrypted = cipher.update(streamKey, "utf8", "hex");
@@ -1647,20 +1691,24 @@ app.put("/api/users/:userId/stream-keys", async (req, res) => {
 // RTMP Webhook: on_publish
 app.post("/api/rtmp/on-publish", async (req, res) => {
   const { name: streamKey } = req.body;
-  
+
   try {
     // Find the stream by key
     const stream = await prisma.stream.findFirst({
-      where: { streamKey: streamKey, status: "LIVE" }
+      where: { streamKey: streamKey, status: "LIVE" },
     });
 
     if (!stream) {
-      console.warn(`[RTMP] Rejecting publish: No active stream found for key ${streamKey}`);
+      console.warn(
+        `[RTMP] Rejecting publish: No active stream found for key ${streamKey}`,
+      );
       return res.status(404).json({ error: "Stream not found" });
     }
 
-    console.log(`[RTMP] Ingest detected for stream ${stream.id}. Bridging to WebRTC.`);
-    
+    console.log(
+      `[RTMP] Ingest detected for stream ${stream.id}. Bridging to WebRTC.`,
+    );
+
     // Trigger the WebRTC bridge
     await ingestManager.startIngestBridge(stream.id, streamKey);
 
@@ -1673,14 +1721,16 @@ app.post("/api/rtmp/on-publish", async (req, res) => {
 
 app.post("/api/rtmp/on-publish-done", async (req, res) => {
   const { name: streamKey } = req.body;
-  
+
   try {
     const stream = await prisma.stream.findFirst({
-      where: { streamKey: streamKey }
+      where: { streamKey: streamKey },
     });
 
     if (stream) {
-      console.log(`[RTMP] Stream stopped for key ${streamKey}. Stopping bridge.`);
+      console.log(
+        `[RTMP] Stream stopped for key ${streamKey}. Stopping bridge.`,
+      );
       ingestManager.stopIngestBridge(stream.id);
     }
 
@@ -1699,10 +1749,10 @@ app.post("/api/rtmp/on-publish-done", async (req, res) => {
 app.post("/api/creators/onboard", requireAuth, async (req: any, res: any) => {
   try {
     const creator = req.creator;
-    
+
     // Create connect account if not exists
     let stripeAccountId = creator.stripeAccountId;
-    
+
     if (!stripeAccountId) {
       const account = await stripe.accounts.create({
         type: "express",
@@ -1712,7 +1762,7 @@ app.post("/api/creators/onboard", requireAuth, async (req: any, res: any) => {
           transfers: { requested: true },
         },
       });
-      
+
       stripeAccountId = account.id;
       await prisma.creator.update({
         where: { id: creator.id },
@@ -1726,10 +1776,10 @@ app.post("/api/creators/onboard", requireAuth, async (req: any, res: any) => {
       return_url: `${process.env.FRONTEND_URL}/dashboard?onboarding=complete`,
       type: "account_onboarding",
     });
-    
+
     res.json({
       url: accountLink.url,
-      success: true
+      success: true,
     });
   } catch (error: any) {
     console.error("[Stripe] Onboarding Error:", error);
@@ -1738,73 +1788,83 @@ app.post("/api/creators/onboard", requireAuth, async (req: any, res: any) => {
 });
 
 // Mux - Create Asset/Upload URL
-app.post("/api/creators/upload-url", requireAuth, async (req: any, res: any) => {
-  try {
-    const upload = await mux.video.uploads.create({
-      cors_origin: "*",
-      new_asset_settings: {
-        playback_policy: ["public"],
-      },
-    });
-    
-    res.json({
-      uploadUrl: upload.url,
-      id: upload.id
-    });
-  } catch (error: any) {
-    console.error("[Mux] Upload Error:", error);
-    res.status(500).json({ error: "Failed to create Mux upload URL" });
-  }
-});
+app.post(
+  "/api/creators/upload-url",
+  requireAuth,
+  async (req: any, res: any) => {
+    try {
+      const upload = await mux.video.uploads.create({
+        cors_origin: "*",
+        new_asset_settings: {
+          playback_policy: ["public"],
+        },
+      });
+
+      res.json({
+        uploadUrl: upload.url,
+        id: upload.id,
+      });
+    } catch (error: any) {
+      console.error("[Mux] Upload Error:", error);
+      res.status(500).json({ error: "Failed to create Mux upload URL" });
+    }
+  },
+);
 
 // Marketplace Checkout Session
-app.post("/api/marketplace/create-checkout", requireAuth, async (req: any, res: any) => {
-  try {
-    const { videoPostId } = req.body;
-    const post = await prisma.videoPost.findUnique({
-      where: { id: videoPostId },
-      include: { creator: true }
-    });
+app.post(
+  "/api/marketplace/create-checkout",
+  requireAuth,
+  async (req: any, res: any) => {
+    try {
+      const { videoPostId } = req.body;
+      const post = await prisma.videoPost.findUnique({
+        where: { id: videoPostId },
+        include: { creator: true },
+      });
 
-    if (!post || !post.creator.stripeAccountId) {
-      return res.status(404).json({ error: "Post or Creator not found" });
-    }
+      if (!post || !post.creator.stripeAccountId) {
+        return res.status(404).json({ error: "Post or Creator not found" });
+      }
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ["card"],
-      line_items: [{
-        price_data: {
-          currency: "usd",
-          product_data: {
-            name: post.title,
-            description: post.description || undefined,
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: post.title,
+                description: post.description || undefined,
+              },
+              unit_amount: Math.round(Number(post.price) * 100),
+            },
+            quantity: 1,
           },
-          unit_amount: Math.round(Number(post.price) * 100),
+        ],
+        mode: "payment",
+        metadata: {
+          videoPostId: post.id,
+          buyerId: req.auth.userId, // Clerk ID of buyer
+          creatorId: post.creatorId, // Internal ID of seller
         },
-        quantity: 1,
-      }],
-      mode: "payment",
-      metadata: {
-        videoPostId: post.id,
-        buyerId: req.auth.userId, // Clerk ID of buyer
-        creatorId: post.creatorId, // Internal ID of seller
-      },
-      success_url: `${process.env.FRONTEND_URL}/marketplace?purchase_success=true&id=${post.id}`,
-      cancel_url: `${process.env.FRONTEND_URL}/marketplace?purchase_cancel=true`,
-      payment_intent_data: {
-        application_fee_amount: 0, // Zero fee platform
-        transfer_data: {
-          destination: post.creator.stripeAccountId,
+        success_url: `${process.env.FRONTEND_URL}/marketplace?purchase_success=true&id=${post.id}`,
+        cancel_url: `${process.env.FRONTEND_URL}/marketplace?purchase_cancel=true`,
+        payment_intent_data: {
+          application_fee_amount: 0, // Zero fee platform
+          transfer_data: {
+            destination: post.creator.stripeAccountId,
+          },
         },
-      },
-    });
+      });
 
-    res.json({ id: session.id, url: session.url });
-  } catch (error: any) {
-    console.error("[Stripe] Checkout Error:", error);
-    res.status(500).json({ error: "Failed to create checkout session" });
-  }
-});
+      res.json({ id: session.id, url: session.url });
+    } catch (error: any) {
+      console.error("[Stripe] Checkout Error:", error);
+      res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  },
+);
 
 // ============================================
 // MARKETPLACE ROUTES
@@ -1990,14 +2050,17 @@ io.on("connection", (socket) => {
         callback({ producerId: producer.id });
 
         const isHostProducer = await prisma.stream.findFirst({
-          where: { id: streamId, creator: { clerkId: socket.handshake.auth.userId } }
+          where: {
+            id: streamId,
+            creator: { clerkId: socket.handshake.auth.userId },
+          },
         });
 
         // Notify all clients in the room about the new producer
         socket.to(streamId).emit("new-producer", {
           producerId: producer.id,
           kind,
-          socketId: isHostProducer ? 'host' : socket.id,
+          socketId: isHostProducer ? "host" : socket.id,
         });
       } catch (error: any) {
         console.error("[Socket] Error producing:", error);
@@ -2052,7 +2115,8 @@ io.on("connection", (socket) => {
         data: {
           streamId: streamId,
           userId: userId,
-          message: moderation.action === "delete" ? "[Message removed]" : message,
+          message:
+            moderation.action === "delete" ? "[Message removed]" : message,
           aiModerated: true,
           aiConfidence: moderation.confidence,
           aiAction: moderation.action,
@@ -2071,7 +2135,8 @@ io.on("connection", (socket) => {
           id: data.id,
           userId,
           username,
-          message: moderation.action === "flag" ? `[Flagged] ${message}` : message,
+          message:
+            moderation.action === "flag" ? `[Flagged] ${message}` : message,
           timestamp: data.createdAt,
         });
       }
