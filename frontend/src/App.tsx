@@ -19,7 +19,10 @@ import {
   Layout, 
   ShoppingBag,
   ExternalLink,
-  Users
+  Users,
+  Mic,
+  Activity,
+  ArrowRight
 } from 'lucide-react';
 import './App.css';
 import { CreatorDashboard } from './CreatorDashboard';
@@ -357,10 +360,12 @@ const GoldBoardGrid: React.FC<{
   };
 
   return (
-    <div className="gold-board-grid">
+    <div className="gold-board-grid fade-in">
       {/* Host Panel - Top Left with Gold Border */}
-      <div className="host-panel gold-border">
-        <div className="panel-label">HOST</div>
+      <div className={`host-panel ${isHost || localStream || hostRemoteStream ? 'gold-border' : ''}`}>
+        <div className="panel-label">
+           <Activity size={10} className="icon-gold" /> HOST
+        </div>
         <video
           ref={hostVideoRef}
           autoPlay
@@ -396,16 +401,16 @@ const GoldBoardGrid: React.FC<{
           {/* Empty Slots */}
           {Array.from({ length: Math.max(0, 20 - guests.length) }).map((_, index) => (
             <div key={`empty-${index}`} className="guest-panel empty">
-              <div className="panel-label">SLOT {guests.length + index + 1}</div>
+              <div className="panel-label">SIGNAL {guests.length + index + 1}</div>
               <div className="video-placeholder">
-                <span className="slot-number">{guests.length + index + 1}</span>
+                <Mic size={24} className="icon-muted" />
               </div>
               {!isHost && !currentGuestId && (
                 <button 
-                  className="join-slot-btn"
+                  className="join-slot-btn premium-btn"
                   onClick={onJoinAsGuest}
                 >
-                  Join Panel
+                  JOIN SIGNAL
                 </button>
               )}
             </div>
@@ -1090,13 +1095,19 @@ const WatchPartyRoom: React.FC<{
           </div>
           <div className="chat-messages">
             {chatMessages.map((m, i) => (
-              <div key={i} className={`chat-message ${m.userId === 'swani-ai' ? 'ai' : ''}`}>
-                <span className="chat-username">{m.username}</span>
+              <div key={i} className={`chat-message ${m.userId === 'swani-ai' ? 'ai-glow' : ''}`}>
+                <div className="chat-msg-header">
+                  <span className="chat-username">{m.username}</span>
+                  {m.userId === 'swani-ai' && <Zap size={10} className="icon-gold" />}
+                </div>
                 <p className="chat-text">{m.message}</p>
               </div>
             ))}
             {chatMessages.length === 0 && (
-              <div className="chat-notice">Ask SWANI AI for info about the video!</div>
+              <div className="chat-notice-box">
+                <Zap size={24} className="icon-gold" />
+                <p>Aura AI is standing by. Ask about this stream!</p>
+              </div>
             )}
           </div>
           <div className="chat-input-form">
@@ -1270,11 +1281,24 @@ const App: React.FC = () => {
                 Start Watch Party
               </button>
               
-              <div className="join-party-container">
-                <p className="join-party-label">Join by Invite Code</p>
+              <div className="join-party-container gold-border-thin">
+                <p className="join-party-label">SIGNAL ACCESS CODE</p>
                 <div className="join-party-input-group">
-                  <input type="text" placeholder="CODE" className="chat-input join-party-input" />
-                  <button className="chat-send-btn">➔</button>
+                  <input 
+                    type="text" 
+                    placeholder="ENTER CODE" 
+                    className="chat-input join-party-input" 
+                    id="inviteCodeInput"
+                  />
+                  <button 
+                    className="join-access-btn"
+                    onClick={() => {
+                      const code = (document.getElementById('inviteCodeInput') as HTMLInputElement).value;
+                      if (code) handleJoinParty(code);
+                    }}
+                  >
+                    <ArrowRight size={18} />
+                  </button>
                 </div>
               </div>
             </div>
