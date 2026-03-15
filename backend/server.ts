@@ -27,7 +27,7 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 
 // SDK Initializations
 const stripe = new Stripe(
-  process.env.STRIPE_SECRET_KEY || "sk_test_placeholder",
+  process.env.STRIPE_SECRET_KEY || "placeholder_stripe_secret_key",
   {
     apiVersion: "2023-10-16" as any,
   },
