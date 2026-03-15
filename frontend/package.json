@@ -21,6 +21,7 @@
     "mediasoup-client": "^3.7.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-player": "^3.4.0",
     "react-router-dom": "^6.21.1",
     "react-scripts": "5.0.1",
     "schema-utils": "^4.3.3",

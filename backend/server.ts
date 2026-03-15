@@ -1051,6 +1051,8 @@ class WatchPartyManager extends EventEmitter {
         isPlaying: false,
         lastUpdated: Date.now(),
       },
+      videoUrl: partyData.videoUrl,
+      title: partyData.title,
     });
 
     return data;
@@ -1073,6 +1075,8 @@ class WatchPartyManager extends EventEmitter {
           isPlaying: data.isPlaying,
           lastUpdated: Date.now(),
         },
+        videoUrl: data.videoUrl,
+        title: data.title,
       });
     }
 
@@ -2176,12 +2180,24 @@ io.on("connection", (socket) => {
   // Chat message with AI moderation
   socket.on("chat-message", async ({ streamId, message, userId, username }) => {
     try {
-      // AI Moderation
-      const moderation = await swaniAI.moderateMessage(message, {
-        streamId,
-        userId,
-        username,
+      // 1. Fetch Creator/Stream setup to check Aura settings
+      const stream = await prisma.stream.findUnique({
+        where: { id: streamId },
+        include: { creator: true }
       });
+
+      if (!stream) return;
+
+      let moderation = { action: "allow", confidence: 1.0, reason: "" };
+
+      // 2. AI Moderation (Only if Aura is enabled for this creator)
+      if (stream.creator.auraEnabled) {
+        moderation = await swaniAI.moderateMessage(message, {
+          streamId,
+          userId,
+          username,
+        });
+      }
 
       // Store message in database
       const data = await prisma.chatMessage.create({
@@ -2305,6 +2321,10 @@ io.on("connection", (socket) => {
       socket.emit("watch-party-joined", {
         partyId,
         playback: party.playback,
+        partyData: {
+          videoUrl: party.videoUrl,
+          title: party.title,
+        },
         participants: Array.from(party.participants.entries()).map(
           (item: any) => ({
             userId: item[0],

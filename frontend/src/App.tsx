@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import './App.css';
 import { CreatorDashboard } from './CreatorDashboard';
+import ReactPlayer from 'react-player';
 
 // ============================================
 // TYPES
@@ -281,7 +282,7 @@ const MarketplaceView: React.FC<{
                 <div className="post-thumbnail">
                   <img src={post.thumbnail_url} alt={post.title} />
                   {post.price > 0 && <span className="price-tag">${post.price}</span>}
-                  <button className="play-overlay"><Play fill="white" size={32} /></button>
+                  <button className="play-overlay" aria-label="Play video"><Play fill="white" size={32} /></button>
                 </div>
                 <div className="post-info">
                   <h4>{post.title}</h4>
@@ -305,130 +306,6 @@ const MarketplaceView: React.FC<{
             </div>
           )}
         </main>
-      </div>
-    </div>
-  );
-};
-
-// ============================================
-// CREATOR DASHBOARD COMPONENT
-// ============================================
-
-const CreatorDashboard: React.FC<{
-  onBack: () => void;
-  getToken: () => Promise<string | null>;
-}> = ({ onBack, getToken }) => {
-  const { user } = useUser();
-  const [onboardingUrl, setOnboardingUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const handleStartOnboarding = async () => {
-    setLoading(true);
-    try {
-      const token = await getToken();
-      const response = await fetch('/api/creators/onboard', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      const data = await response.json();
-      if (data.url) {
-        window.location.href = data.url;
-      }
-    } catch (error) {
-      console.error('Onboarding failed:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="dashboard-view">
-      <header className="marketplace-header glass-effect">
-        <button className="back-btn" onClick={onBack}>← Back</button>
-        <div className="header-title-group">
-          <Layout className="icon-gold" />
-          <h2 className="glow-text">CREATOR COMMAND</h2>
-        </div>
-      </header>
-
-      <div className="dashboard-content">
-        <div className="dashboard-grid">
-          {/* Revenue Panel */}
-          <div className="dashboard-panel gold-border">
-            <div className="panel-header">
-              <DollarSign className="icon-gold" />
-              <h3>REVENUE OPERATIONS</h3>
-            </div>
-            <div className="revenue-stats">
-              <div className="big-stat">
-                <span className="stat-label">TOTAL EARNINGS</span>
-                <span className="stat-value">$0.00</span>
-              </div>
-              <div className="big-stat">
-                <span className="stat-label">PLATFORM FEES PAID</span>
-                <span className="stat-value">$0.00</span>
-              </div>
-            </div>
-            <div className="stripe-status">
-              <p>Enable direct-to-bank payouts via Stripe Connect.</p>
-              <button 
-                className="host-btn stripe-btn" 
-                onClick={handleStartOnboarding}
-                disabled={loading}
-              >
-                {loading ? 'CONNECTING...' : 'SETUP DIRECT PAYOUTS'}
-              </button>
-            </div>
-          </div>
-
-          {/* Stream Settings */}
-          <div className="dashboard-panel gold-border">
-            <div className="panel-header">
-              <Zap className="icon-red" />
-              <h3>SIGNAL CONFIGURATION</h3>
-            </div>
-            <div className="setting-item">
-              <label>RTMP ENDPOINT</label>
-              <div className="input-copy-group">
-                <input readOnly value="rtmp://35.147.110.1:1935/live" className="chat-input" />
-                <button className="copy-btn">COPY</button>
-              </div>
-            </div>
-            <div className="setting-item">
-              <label>STREAM KEY</label>
-              <div className="input-copy-group">
-                <input type="password" readOnly value="CY_LIVE_••••••••••••" className="chat-input" />
-                <button className="copy-btn">REVEAL</button>
-              </div>
-            </div>
-            <div className="security-notice">
-              <Shield size={14} />
-              <span>Keys are encrypted with AES-256-CBC.</span>
-            </div>
-          </div>
-
-          {/* User Management */}
-          <div className="dashboard-panel gold-border full-width">
-            <div className="panel-header">
-              <Users className="icon-gold" />
-              <h3>FAN BASE</h3>
-            </div>
-            <div className="fan-metrics">
-              <div className="fan-stat">
-                <h3>0</h3>
-                <p>FOLLOWERS</p>
-              </div>
-              <div className="fan-stat">
-                <h3>0</h3>
-                <p>SUBSCRIPTIONS</p>
-              </div>
-              <div className="fan-stat">
-                <h3>0</h3>
-                <p>WHALES</p>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -1075,14 +952,22 @@ const WatchPartyRoom: React.FC<{
   const [participants, setParticipants] = useState<{userId: string, isReady: boolean}[]>([]);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isReady, setIsReady] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string>('https://www.youtube.com/watch?v=dQw4w9WgXcQ'); // Default demo
+  const playerRef = useRef<ReactPlayer>(null);
 
   useEffect(() => {
     if (!socket) return;
 
-    socket.on('watch-party-joined', ({ playback, participants }) => {
+    socket.on('watch-party-joined', ({ playback, participants, partyData }) => {
       setIsPlaying(playback.isPlaying);
       setCurrentTime(playback.currentTime);
       setParticipants(participants);
+      if (partyData?.videoUrl) setVideoUrl(partyData.videoUrl);
+      
+      // Sync player to current time on join
+      if (playerRef.current) {
+        playerRef.current.seekTo(playback.currentTime);
+      }
     });
 
     socket.on('participant-joined', ({ userId }) => {
@@ -1090,8 +975,15 @@ const WatchPartyRoom: React.FC<{
     });
 
     socket.on('playback-updated', ({ currentTime, isPlaying }) => {
-      setCurrentTime(currentTime);
       setIsPlaying(isPlaying);
+      // Only seek if we are drifting by more than 2 seconds
+      if (playerRef.current) {
+        const drift = Math.abs(playerRef.current.getCurrentTime() - currentTime);
+        if (drift > 2) {
+          playerRef.current.seekTo(currentTime);
+        }
+      }
+      setCurrentTime(currentTime);
     });
 
     socket.on('participant-ready-change', ({ userId: rUserId, isReady }) => {
@@ -1128,13 +1020,34 @@ const WatchPartyRoom: React.FC<{
   };
 
   return (
-    <div className="watch-party-view">
+    <div className="watch-party-view fade-in">
       <div className="watch-party-main">
-        <div className="video-container gold-border">
-          <div className="video-placeholder">
-            <span className="live-indicator">SYNCHRONIZED PLAYBACK</span>
-            <p>Video ID: {partyId} • {isPlaying ? 'Playing' : 'Paused'} • {Math.floor(currentTime)}s</p>
-          </div>
+        <div className="video-container premium-shadow">
+          <ReactPlayer
+            ref={playerRef}
+            url={videoUrl}
+            playing={isPlaying}
+            controls={isHost}
+            width="100%"
+            height="100%"
+            onPlay={() => isHost && syncPlayback(playerRef.current?.getCurrentTime() || 0, true)}
+            onPause={() => isHost && syncPlayback(playerRef.current?.getCurrentTime() || 0, false)}
+            onProgress={({ playedSeconds }) => {
+              if (isHost && Math.abs(playedSeconds - currentTime) > 1) {
+                syncPlayback(playedSeconds, isPlaying);
+              }
+            }}
+            config={{
+              youtube: { playerVars: { origin: window.location.origin } }
+            }}
+          />
+          {!isHost && (
+             <div className="playback-overlay">
+               <span className="sync-status">
+                 {isPlaying ? '● LIVE SYNC' : '■ PAUSED BY HOST'}
+               </span>
+             </div>
+          )}
         </div>
 
         <div className="ready-panel">
