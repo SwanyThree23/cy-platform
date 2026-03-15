@@ -22,6 +22,7 @@ import {
   Users
 } from 'lucide-react';
 import './App.css';
+import { CreatorDashboard } from './CreatorDashboard';
 
 // ============================================
 // TYPES

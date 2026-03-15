@@ -1598,6 +1598,79 @@ app.post("/api/streams/:streamId/end", async (req, res) => {
   }
 });
 
+// ============================================
+// CREATOR DASHBOARD API
+// ============================================
+
+// Get Creator Profile
+app.get("/api/creator/profile", async (req: any, res: any) => {
+  try {
+    const creator = req.creator;
+    if (!creator) return res.status(401).json({ error: "Unauthorized" });
+
+    res.json({
+      id: creator.id,
+      handle: creator.handle,
+      displayName: creator.displayName,
+      email: creator.email,
+      rtmpKey: creator.rtmpKey,
+      rtmpSecret: creator.rtmpSecret,
+      plan: creator.plan,
+      auraEnabled: creator.auraEnabled,
+      auraVoice: creator.auraVoice,
+      auraAutoSummary: creator.auraAutoSummary,
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: "Server error fetching profile" });
+  }
+});
+
+// Update Creator Profile
+app.put("/api/creator/profile", async (req: any, res: any) => {
+  try {
+    const creator = req.creator;
+    if (!creator) return res.status(401).json({ error: "Unauthorized" });
+
+    const allowedUpdates = ["displayName", "bio", "auraEnabled", "auraVoice", "auraAutoSummary"];
+    const updateData: any = {};
+    for (const key of allowedUpdates) {
+      if (req.body[key] !== undefined) updateData[key] = req.body[key];
+    }
+
+    const updated = await prisma.creator.update({
+      where: { id: creator.id },
+      data: updateData,
+    });
+
+    res.json({ success: true, creator: updated });
+  } catch (error: any) {
+    res.status(500).json({ error: "Server error updating profile" });
+  }
+});
+
+// Generate RTMP Stream Key
+app.post("/api/creator/generate-keys", async (req: any, res: any) => {
+  try {
+    const creator = req.creator;
+    if (!creator) return res.status(401).json({ error: "Unauthorized" });
+
+    const newKey = `cy_${creator.id.substring(0, 8)}_${crypto.randomBytes(6).toString("hex")}`;
+    const newSecret = crypto.randomBytes(16).toString("hex");
+
+    const updated = await prisma.creator.update({
+      where: { id: creator.id },
+      data: {
+        rtmpKey: newKey,
+        rtmpSecret: newSecret,
+      },
+    });
+
+    res.json({ rtmpKey: updated.rtmpKey, rtmpSecret: updated.rtmpSecret });
+  } catch (error: any) {
+    res.status(500).json({ error: "Failed to generate keys" });
+  }
+});
+
 // Get user payment handles (for donation buttons)
 app.get("/api/users/:userId/payment-handles", async (req, res) => {
   try {

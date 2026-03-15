@@ -1,68 +1,136 @@
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
 
 :root {
-  --obsidian-bg: #0a0a0a;
-  --obsidian-surface: #111111;
-  --obsidian-surface-elevated: #1a1a1a;
-  --text-primary: #ffffff;
-  --text-secondary: #a0a0a0;
-  --signal-accent: #eaeaea; /* Subdued, professional broadcast feel */
-  --font-mono: "IBM Plex Mono", monospace;
+  /* Core Foundation */
+  --bg-base: #050505;
+  --bg-surface: #0a0a0a;
+  --bg-surface-elevated: rgba(30, 30, 30, 0.6);
+  --bg-glass: rgba(15, 15, 15, 0.65);
+  
+  /* Typography */
+  --font-primary: 'Outfit', sans-serif;
+  --font-secondary: 'Inter', sans-serif;
+  
+  /* Brand Accents - CY Gold/Orange */
+  --accent-gold: #FFB800;
+  --accent-orange: #FF5C00;
+  --accent-glow: rgba(255, 184, 0, 0.4);
+  --accent-gradient: linear-gradient(135deg, var(--accent-gold), var(--accent-orange));
+  
+  /* Text */
+  --text-primary: #FFFFFF;
+  --text-secondary: #A1A1AA;
+  --text-muted: #71717A;
+  
+  /* Utility */
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-focus: rgba(255, 184, 0, 0.5);
+  --shadow-glow: 0 0 20px var(--accent-glow);
+  --shadow-glass: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 9999px;
+  
+  /* Animations */
+  --transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-smooth: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 body {
   margin: 0;
-  font-family: var(--font-mono);
+  font-family: var(--font-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--obsidian-bg);
+  background-color: var(--bg-base);
+  background-image: 
+    radial-gradient(circle at 15% 50%, rgba(255, 92, 0, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 85% 30%, rgba(255, 184, 0, 0.03) 0%, transparent 50%);
   color: var(--text-primary);
-  text-transform: uppercase;
-  letter-spacing: 0.05em; /* Bold tracking */
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
-h1,
-h2,
-h3,
-h4,
-h5,
-h6 {
+h1, h2, h3, h4, h5, h6 {
   margin: 0;
-  font-weight: 600;
-  letter-spacing: 0.1em;
+  font-family: var(--font-primary);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
-code {
-  font-family: var(--font-mono);
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--bg-glass);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-glass);
+  border-radius: var(--radius-md);
 }
 
-/* Reset gradients from previous app style */
+.gradient-text {
+  background: var(--accent-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Base Restyling */
 * {
   box-sizing: border-box;
 }
 
 button {
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  border: 1px solid var(--obsidian-surface-elevated);
-  background: var(--obsidian-surface);
+  font-family: var(--font-primary);
+  font-weight: 600;
+  border: 1px solid var(--border-glass);
+  background: rgba(255,255,255,0.03);
   color: var(--text-primary);
   cursor: pointer;
-  transition:
-    background 0.2s,
-    border-color 0.2s;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  padding: 8px 16px;
 }
 
 button:hover {
-  background: var(--obsidian-surface-elevated);
-  border-color: var(--signal-accent);
+  background: rgba(255,255,255,0.08);
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(1px);
 }
 
 input,
 textarea {
-  font-family: var(--font-mono);
-  background: var(--obsidian-surface);
+  font-family: var(--font-secondary);
+  background: rgba(0,0,0,0.3);
   color: var(--text-primary);
-  border: 1px solid var(--obsidian-surface-elevated);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  transition: all var(--transition-fast);
+}
+
+input:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px rgba(255, 184, 0, 0.1);
+}
+
+/* Scrollbar formatting */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,0.1);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255,255,255,0.2);
 }
