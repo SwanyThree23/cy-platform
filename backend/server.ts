@@ -2224,10 +2224,31 @@ io.on("connection", (socket) => {
           id: data.id,
           userId,
           username,
-          message:
-            moderation.action === "flag" ? `[Flagged] ${message}` : message,
+          message: message,
+          aiAction: moderation.action,
+          aiConfidence: moderation.confidence,
           timestamp: data.createdAt,
         });
+
+        // 3. Automated AI Response (if command triggered)
+        if (message.startsWith("!summarize") || message.startsWith("!ask")) {
+          const prompt = message.replace(/^!(summarize|ask)\s*/, "");
+          const context = { streamId, triggerUser: username, theme: "gold-board" };
+          
+          const aiResponse = await swaniAI.askAI(
+            message.startsWith("!summarize") ? "Summarize the chat history for this stream." : prompt, 
+            context
+          );
+
+          io.to(streamId).emit("chat-message", {
+            id: `ai-${Date.now()}`,
+            userId: "swani-ai",
+            username: "SWANI AI",
+            message: aiResponse,
+            timestamp: new Date(),
+            aiAction: "allow",
+          });
+        }
       }
 
       // Log flagged messages for review

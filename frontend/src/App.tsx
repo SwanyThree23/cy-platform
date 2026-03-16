@@ -61,6 +61,8 @@ interface ChatMessage {
   username: string;
   message: string;
   timestamp: string;
+  aiAction?: 'allow' | 'flag' | 'delete';
+  aiConfidence?: number;
 }
 
 interface PaymentHandle {
@@ -392,6 +394,7 @@ const GoldBoardGrid: React.FC<{
                 playsInline
                 className="video-element"
               />
+              <div className="speaking-indicator"></div>
               <div className="guest-info">
                 <span className="guest-name">{guest.username}</span>
               </div>
@@ -520,7 +523,8 @@ const ChatPanel: React.FC<{
   messages: ChatMessage[];
   onSendMessage: (message: string) => void;
   currentUser: string;
-}> = ({ messages, onSendMessage, currentUser }) => {
+  hostId?: string;
+}> = ({ messages, onSendMessage, currentUser, hostId }) => {
   const [inputMessage, setInputMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -544,17 +548,34 @@ const ChatPanel: React.FC<{
     <div className="chat-panel">
       <div className="chat-header">
         <h3>Live Chat</h3>
-        <span className="chat-badge">AI Moderated</span>
+        <div className="ai-controls">
+          <button 
+            className="ai-action-btn"
+            onClick={() => onSendMessage("!summarize")} 
+            title="Summarize Chat"
+          >
+            <Activity size={14} />
+          </button>
+          <div className="ai-assistant-badge aura-pulse">AURA ACTIVE</div>
+        </div>
       </div>
       
       <div className="chat-messages">
         {messages.map((msg) => (
           <div
             key={msg.id}
-            className={`chat-message ${msg.userId === currentUser ? 'own' : ''}`}
+            className={`chat-message ${msg.userId === currentUser ? 'own' : ''} ${msg.aiAction === 'flag' ? 'flagged' : ''}`}
           >
-            <span className="chat-username">{msg.username}</span>
-            <span className="chat-text">{msg.message}</span>
+            <div className="chat-msg-header">
+              <span className={`chat-username ${msg.userId === hostId ? 'creator-name' : ''}`}>
+                {msg.username}
+                {msg.userId === hostId && <Shield size={10} className="icon-gold" style={{marginLeft: '4px'}} />}
+              </span>
+              {msg.aiAction === 'flag' && <Shield size={10} className="icon-red" />}
+            </div>
+            <span className="chat-text">
+              {msg.aiAction === 'flag' ? `[FLAGGED] ${msg.message}` : msg.message}
+            </span>
             <span className="chat-time">
               {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
             </span>
@@ -597,6 +618,7 @@ const StreamView: React.FC<{
   const [paymentHandles, setPaymentHandles] = useState<PaymentHandle>({});
   const [streamInfo, setStreamInfo] = useState<Stream | null>(null);
   const [currentGuestId, setCurrentGuestId] = useState<string>();
+  const [activeDonation, setActiveDonation] = useState<{amount: string, senderName: string, message: string} | null>(null);
 
   // Mediasoup state
   // @ts-ignore
@@ -682,12 +704,18 @@ const StreamView: React.FC<{
       await createConsumer(producerId, socketId);
     });
 
+    socket.on('payment-notification', (donation: { amount: string, senderName: string, message: string }) => {
+      setActiveDonation(donation);
+      setTimeout(() => setActiveDonation(null), 5000); // Clear after 5 seconds
+    });
+
     return () => {
       socket.off('joined-stream');
       socket.off('chat-message');
       socket.off('guest-joined-panel');
       socket.off('guest-left-panel');
       socket.off('new-producer');
+      socket.off('payment-notification');
     };
   }, [socket, streamId, userId, isHost, device, currentGuestId]);
 
@@ -912,6 +940,16 @@ const StreamView: React.FC<{
           currentGuestId={currentGuestId}
         />
 
+        {activeDonation && (
+          <div className="donation-toast premium-shadow glass-effect fade-in">
+            <Zap className="icon-gold" size={24} />
+            <div className="donation-details">
+              <span className="donation-sender">{activeDonation.senderName} SENT {activeDonation.amount}</span>
+              <p className="donation-message">{activeDonation.message}</p>
+            </div>
+          </div>
+        )}
+
         <div className="stream-info-bar">
           <h1 className="stream-title">{streamInfo?.title || 'Live Stream'}</h1>
           <div className="stream-meta">
@@ -935,6 +973,7 @@ const StreamView: React.FC<{
           messages={chatMessages}
           onSendMessage={handleSendMessage}
           currentUser={userId}
+          hostId={streamInfo?.host_id}
         />
       </div>
     </div>
@@ -1051,6 +1090,16 @@ const WatchPartyRoom: React.FC<{
                <span className="sync-status">
                  {isPlaying ? '● LIVE SYNC' : '■ PAUSED BY HOST'}
                </span>
+               <button 
+                 className="mini-sync-btn"
+                 onClick={() => {
+                   if (playerRef.current) {
+                     playerRef.current.seekTo(currentTime);
+                   }
+                 }}
+               >
+                 RE-SYNC
+               </button>
              </div>
           )}
         </div>
@@ -1091,16 +1140,28 @@ const WatchPartyRoom: React.FC<{
         <div className="chat-panel">
           <div className="chat-header">
             <h3>Watch Party Chat</h3>
-            <div className="ai-assistant-badge">AI ASSISTANT READY</div>
+            <div className="ai-controls">
+              <button 
+                className="ai-action-btn"
+                onClick={() => handleAskAI("Summarize the vibes and key points of the chat so far.")}
+                title="Summarize Chat"
+              >
+                <Activity size={14} />
+              </button>
+              <div className="ai-assistant-badge aura-pulse">AURA ACTIVE</div>
+            </div>
           </div>
           <div className="chat-messages">
             {chatMessages.map((m, i) => (
-              <div key={i} className={`chat-message ${m.userId === 'swani-ai' ? 'ai-glow' : ''}`}>
+              <div key={i} className={`chat-message ${m.userId === 'swani-ai' ? 'ai-glow' : ''} ${m.aiAction === 'flag' ? 'flagged' : ''}`}>
                 <div className="chat-msg-header">
                   <span className="chat-username">{m.username}</span>
                   {m.userId === 'swani-ai' && <Zap size={10} className="icon-gold" />}
+                  {m.aiAction === 'flag' && <Shield size={10} className="icon-red" />}
                 </div>
-                <p className="chat-text">{m.message}</p>
+                <p className="chat-text">
+                   {m.aiAction === 'flag' ? `[MODERATED] ${m.message}` : m.message}
+                </p>
               </div>
             ))}
             {chatMessages.length === 0 && (
