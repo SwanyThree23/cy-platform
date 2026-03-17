@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: cy-platform-backend
+    env: docker
+    region: ohio
+    plan: free
+    rootDir: backend
+    dockerfilePath: Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3001"
+      - key: MEDIASOUP_ANNOUNCED_IP
+        value: "" # Leave empty, mediasoup will autodetect
+      - key: STREAM_ENCRYPTION_KEY
+        generateValue: true
+      - key: MEDIASOUP_LISTEN_IP
+        value: "0.0.0.0"
