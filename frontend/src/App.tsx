@@ -10,19 +10,19 @@ import {
   SignedOut 
 } from '@clerk/clerk-react';
 import { 
-  Shield, 
-  Zap, 
-  DollarSign, 
-  Play, 
-  Plus, 
-  Settings, 
-  Layout, 
   ShoppingBag,
-  ExternalLink,
   Users,
-  Mic,
   Activity,
-  ArrowRight
+  ArrowRight,
+  Star,
+  Radio,
+  Layout,
+  Plus,
+  Play,
+  DollarSign,
+  Mic,
+  Shield,
+  Zap
 } from 'lucide-react';
 import './App.css';
 import { CreatorDashboard } from './CreatorDashboard';
@@ -53,6 +53,9 @@ interface Guest {
   gridPosition: number;
   transportId?: string;
   producerId?: string;
+  isMuted?: boolean;
+  isRaisingHand?: boolean;
+  role?: 'host' | 'mod' | 'guest';
 }
 
 interface ChatMessage {
@@ -92,6 +95,118 @@ interface VideoPost {
   };
   created_at: string;
 }
+
+interface WatchPartyGuest {
+  id: string;
+  gridPosition: number;
+  userId: string;
+}
+
+// ============================================
+// STAGE / PARTICIPANT PANEL
+// ============================================
+
+const ParticipantStage: React.FC<{
+  participants: { 
+    id: string; 
+    name: string; 
+    avatar?: string; 
+    isSpeaking?: boolean; 
+    isSharing?: boolean; 
+    isReady?: boolean;
+    isMuted?: boolean;
+    role?: 'host' | 'mod' | 'guest';
+    likes?: number;
+  }[];
+}> = ({ participants }) => {
+  return (
+    <div className="participant-stage glass-effect">
+      <div className="stage-header">
+        <Users size={14} className="icon-gold" />
+        <span>STAGE ({participants.length})</span>
+      </div>
+      <div className="participant-grid">
+        {participants.map((p) => (
+          <div key={p.id} className={`participant-bubble ${p.isSpeaking ? 'speaking-glow' : ''}`}>
+            <div className="avatar-wrapper">
+              {p.avatar ? (
+                <img src={p.avatar} alt={p.name} className="participant-avatar" />
+              ) : (
+                <div className="participant-avatar-placeholder">{p.name[0]}</div>
+              )}
+              {p.isSharing && <div className="sharing-indicator"><Layout size={8} /></div>}
+              {p.isMuted && <div className="muted-indicator"><Mic size={8} className="icon-red-slash" /></div>}
+              {p.role === 'host' && <div className="role-badge crown-gold">👑</div>}
+              <div className={`status-dot ${p.isReady ? 'online' : 'offline'}`}></div>
+              <button className="bubble-like-btn" title="Glow participant" aria-label="Glow participant"><Star size={8} /></button>
+            </div>
+            <div className="participant-info">
+              <span className="participant-name">{p.name}</span>
+              {p.isSpeaking && <span className="speaking-label">Speaking...</span>}
+            </div>
+          </div>
+        ))}
+        <button className="add-participant-btn" aria-label="Invite to Stage" title="Invite to Stage">
+          <Plus size={20} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// ============================================
+// STREAM TELEMETRY & INSIGHTS
+// ============================================
+
+const StreamTelemetry: React.FC<{
+  metrics: { viewers: number; peak: number; revenue: number; signal: number };
+}> = ({ metrics }) => {
+  return (
+    <div className="stream-telemetry-bar glass-effect">
+      <div className="telemetry-item">
+        <span className="telemetry-label">UPLINK STATUS</span>
+        <span className="telemetry-value status-live">SECURE</span>
+      </div>
+      <div className="telemetry-item">
+        <span className="telemetry-label">VIEWER MATRIX</span>
+        <span className="telemetry-value">{metrics.viewers.toLocaleString()}</span>
+      </div>
+      <div className="telemetry-item">
+        <span className="telemetry-label">SIGNAL INTEGRITY</span>
+        <div className="signal-meter">
+          <div className="signal-bar" style={{ '--signal-width': `${metrics.signal}%` } as React.CSSProperties}></div>
+        </div>
+        <span className="telemetry-value">{metrics.signal}%</span>
+      </div>
+      <div className="telemetry-item">
+        <span className="telemetry-label">REVENUE FLOW</span>
+        <span className="telemetry-value text-gold">${metrics.revenue.toFixed(2)}</span>
+      </div>
+    </div>
+  );
+};
+
+const AIInsights: React.FC<{
+  summaries: string[];
+}> = ({ summaries }) => {
+  if (summaries.length === 0) return null;
+  
+  return (
+    <div className="ai-insights-panel glass-effect fade-in">
+      <div className="insights-header">
+        <Zap size={14} className="icon-gold" />
+        <span>AURA SIGNAL HIGHLIGHTS</span>
+      </div>
+      <div className="insights-list">
+        {summaries.map((s, i) => (
+          <div key={i} className="insight-item">
+            <p>{s}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 // ============================================
 // MARKETPLACE VIEW COMPONENT
@@ -344,6 +459,19 @@ const GoldBoardGrid: React.FC<{
 }) => {
   const hostVideoRef = useRef<HTMLVideoElement>(null);
   const guestVideoRefs = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const [speakingGuestId, setSpeakingGuestId] = useState<string | null>(null);
+
+  // Simulation: Random speaking indicators
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (guests.length > 0) {
+        const randomGuest = guests[Math.floor(Math.random() * guests.length)];
+        setSpeakingGuestId(randomGuest.id);
+        setTimeout(() => setSpeakingGuestId(null), 2000);
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [guests]);
 
   useEffect(() => {
     if (hostVideoRef.current) {
@@ -386,7 +514,7 @@ const GoldBoardGrid: React.FC<{
       <div className="guests-container">
         <div className="guests-grid">
           {guests.map((guest) => (
-            <div key={guest.id} className="guest-panel">
+            <div key={guest.id} className={`guest-panel ${speakingGuestId === guest.id ? 'speaking' : ''}`}>
               <div className="panel-label">GUEST {guest.gridPosition + 1}</div>
               <video
                 ref={(el) => setGuestVideoRef(guest.id, el)}
@@ -401,23 +529,30 @@ const GoldBoardGrid: React.FC<{
             </div>
           ))}
 
-          {/* Empty Slots */}
-          {Array.from({ length: Math.max(0, 20 - guests.length) }).map((_, index) => (
-            <div key={`empty-${index}`} className="guest-panel empty">
-              <div className="panel-label">SIGNAL {guests.length + index + 1}</div>
-              <div className="video-placeholder">
-                <Mic size={24} className="icon-muted" />
+          {/* Empty Slots & Requests */}
+          {Array.from({ length: 9 }).map((_, index) => {
+            const guest = guests.find(g => g.gridPosition === index);
+            if (guest) return null; // Handled by map above in real logic
+            
+            return (
+              <div key={`empty-${index}`} className="guest-panel empty request-slot">
+                <div className="panel-label">SLOT {index + 1}</div>
+                <div className="video-placeholder">
+                  <Plus size={32} className="icon-faint" />
+                  <span className="request-text">Request</span>
+                </div>
+                {!isHost && !currentGuestId && (
+                  <button 
+                    className="join-slot-btn"
+                    onClick={onJoinAsGuest}
+                    title="Request to Join"
+                  >
+                    +
+                  </button>
+                )}
               </div>
-              {!isHost && !currentGuestId && (
-                <button 
-                  className="join-slot-btn premium-btn"
-                  onClick={onJoinAsGuest}
-                >
-                  JOIN SIGNAL
-                </button>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
@@ -572,6 +707,7 @@ const ChatPanel: React.FC<{
                 {msg.userId === hostId && <Shield size={10} className="icon-gold" style={{marginLeft: '4px'}} />}
               </span>
               {msg.aiAction === 'flag' && <Shield size={10} className="icon-red" />}
+              {msg.aiConfidence && msg.aiConfidence > 0.8 && <Zap size={8} className="icon-gold" title={`Aura Confidence: ${Math.round(msg.aiConfidence * 100)}%`} />}
             </div>
             <span className="chat-text">
               {msg.aiAction === 'flag' ? `[FLAGGED] ${msg.message}` : msg.message}
@@ -618,8 +754,41 @@ const StreamView: React.FC<{
   const [paymentHandles, setPaymentHandles] = useState<PaymentHandle>({});
   const [streamInfo, setStreamInfo] = useState<Stream | null>(null);
   const [currentGuestId, setCurrentGuestId] = useState<string>();
-  const [activeDonation, setActiveDonation] = useState<{amount: string, senderName: string, message: string} | null>(null);
+  const [activeDonation, setActiveDonation] = useState<{ amount: string, senderName: string, message: string } | null>(null);
+  const [streamMetrics, setStreamMetrics] = useState({ viewers: 2420, peak: 2850, revenue: 124.50, signal: 98 });
+   const [aiSummaries, setAiSummaries] = useState<string[]>([]);
+  const [pinnedItem, setPinnedItem] = useState<VideoPost | null>(null);
+  const [sharedMediaUrl, setSharedMediaUrl] = useState<string | null>('https://www.youtube.com/watch?v=dQw4w9WgXcQ'); // Simulated watch party
+  const [roomLikes, setRoomLikes] = useState(54);
+  
+  // Simulation for dynamic telemetry
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setStreamMetrics(prev => ({
+        ...prev,
+        viewers: prev.viewers + Math.floor(Math.random() * 10 - 5),
+        signal: Math.max(92, Math.min(100, prev.signal + (Math.random() > 0.5 ? 1 : -1)))
+      }));
+    }, 3000);
 
+    // Simulation: A pinned marketplace item
+    setTimeout(() => {
+      setPinnedItem({
+        id: 'pinned-1',
+        title: 'Limited Edition Backstage Pass',
+        price: 49.99,
+        video_url: '',
+        user_id: streamId,
+        is_for_sale: true,
+        views_count: 0,
+        likes_count: 0,
+        created_at: new Date().toISOString(),
+        currency: 'USD'
+      });
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [streamId]);
   // Mediasoup state
   // @ts-ignore
   const [device, setDevice] = useState<Device | null>(null);
@@ -706,7 +875,12 @@ const StreamView: React.FC<{
 
     socket.on('payment-notification', (donation: { amount: string, senderName: string, message: string }) => {
       setActiveDonation(donation);
-      setTimeout(() => setActiveDonation(null), 5000); // Clear after 5 seconds
+      setStreamMetrics(prev => ({ ...prev, revenue: prev.revenue + parseFloat(donation.amount) }));
+      setTimeout(() => setActiveDonation(null), 8000); 
+    });
+
+    socket.on('stream-summary', (summary: string) => {
+      setAiSummaries(prev => [summary, ...prev].slice(0, 3));
     });
 
     return () => {
@@ -716,6 +890,7 @@ const StreamView: React.FC<{
       socket.off('guest-left-panel');
       socket.off('new-producer');
       socket.off('payment-notification');
+      socket.off('stream-summary');
     };
   }, [socket, streamId, userId, isHost, device, currentGuestId]);
 
@@ -928,6 +1103,25 @@ const StreamView: React.FC<{
   return (
     <div className="stream-view">
       <div className="stream-main">
+        {sharedMediaUrl && (
+          <div className="shared-media-container glass-panel gold-border fade-in">
+             <div className="media-header">
+                <span className="media-badge">WATCH PARTY</span>
+                <h3>Shared Activity: A.I. Music Biz Talk</h3>
+             </div>
+             <div className="video-wrapper">
+               <ReactPlayer 
+                  url={sharedMediaUrl} 
+                  width="100%" 
+                  height="100%" 
+                  playing 
+                  muted={true}
+                  controls
+                />
+             </div>
+          </div>
+        )}
+
         <GoldBoardGrid
           streamId={streamId}
           isHost={isHost}
@@ -940,15 +1134,28 @@ const StreamView: React.FC<{
           currentGuestId={currentGuestId}
         />
 
-        {activeDonation && (
-          <div className="donation-toast premium-shadow glass-effect fade-in">
-            <Zap className="icon-gold" size={24} />
-            <div className="donation-details">
-              <span className="donation-sender">{activeDonation.senderName} SENT {activeDonation.amount}</span>
-              <p className="donation-message">{activeDonation.message}</p>
-            </div>
-          </div>
-        )}
+        <ParticipantStage 
+          participants={[
+            { id: '1', name: 'Ms. Tiff', isSpeaking: true, isReady: true, role: 'host', likes: 12 },
+            { id: '2', name: 'Esta', isSpeaking: false, isReady: true, role: 'mod', isMuted: true },
+            { id: '3', name: 'Phelo', isSpeaking: false, isReady: true, role: 'mod' },
+            { id: '4', name: 'Marvin', isSpeaking: false, isReady: true, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Marvin' },
+            { id: '5', name: 'Joyce', isSpeaking: false, isReady: true, avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Joyce' }
+          ]} 
+        />
+
+        <div className="room-controls-bar glass-effect">
+           <button className="room-btn leave-btn" onClick={() => window.location.reload()}>Leave room</button>
+           <div className="room-actions">
+              <button className="action-circle-btn" title="Chat"><Activity size={20} /></button>
+              <button className="action-circle-btn interaction-btn" onClick={() => setRoomLikes(l => l + 1)}>
+                <Star size={20} className="icon-gold" />
+                <span className="action-count">{roomLikes}</span>
+              </button>
+              <button className="action-circle-btn" title="Raise Hand"><ArrowRight size={20} style={{transform: 'rotate(-90deg)'}} /></button>
+              <button className="action-circle-btn mic-toggle-btn" title="Mute/Unmute"><Mic size={20} /></button>
+           </div>
+        </div>
 
         <div className="stream-info-bar">
           <h1 className="stream-title">{streamInfo?.title || 'Live Stream'}</h1>
@@ -969,8 +1176,41 @@ const StreamView: React.FC<{
       </div>
 
       <div className="stream-sidebar">
-        <ChatPanel
-          messages={chatMessages}
+          <AIInsights summaries={aiSummaries} />
+
+          {activeDonation && (
+            <div className="donation-toast-v2 premium-shadow gold-border fade-in">
+              <div className="donation-glow"></div>
+              <div className="donation-content">
+                <div className="donation-header">
+                  <Star className="icon-gold bounce" size={24} />
+                  <h3>NEW SIGNAL CONTRIBUTION</h3>
+                </div>
+                <div className="donation-amount">${activeDonation.amount}</div>
+                <div className="donation-meta">
+                  <span className="sender">{activeDonation.senderName}</span>
+                  <p className="message">"{activeDonation.message}"</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <StreamTelemetry metrics={streamMetrics} />
+        
+          {pinnedItem && (
+            <div className="pinned-item-overlay glass-effect fade-in">
+              <div className="pinned-label">COMMERCIAL SIGNAL</div>
+              <div className="pinned-content">
+                <ShoppingBag size={14} className="icon-gold" />
+                <span className="pinned-title">{pinnedItem.title}</span>
+                <span className="pinned-price text-gold">${pinnedItem.price}</span>
+                <button className="buy-btn-small premium-btn" onClick={() => setPinnedItem(null)}>STAKE</button>
+              </div>
+            </div>
+          )}
+
+        <ChatPanel 
+          messages={chatMessages} 
           onSendMessage={handleSendMessage}
           currentUser={userId}
           hostId={streamInfo?.host_id}
@@ -1191,6 +1431,163 @@ const WatchPartyRoom: React.FC<{
 };
 
 // ============================================
+// STREAM SETUP MODAL
+// ============================================
+const StreamSetupModal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  onStart: (config: { title: string; category: string; platforms: string[]; type: string }) => void;
+}> = ({ isOpen, onClose, onStart }) => {
+  const [title, setTitle] = useState('');
+  const [category, setCategory] = useState('Auction');
+  const [streamType, setStreamType] = useState('panel');
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['CY Live']);
+  const [mediaStatus, setMediaStatus] = useState({ camera: 'granted', mic: 'granted' });
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [ticketPrice, setTicketPrice] = useState(0);
+
+  const platforms = ['CY Live', 'X (Twitter)', 'YouTube', 'Twitch'];
+  const streamTypes = [
+    { id: 'single', label: 'Single Cam', icon: <Play size={20} /> },
+    { id: 'panel', label: 'Panel', icon: <Users size={20} /> },
+    { id: 'audio', label: 'Audio Room', icon: <Mic size={20} /> }
+  ];
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="modal-overlay fade-in">
+      <div className="setup-modal-v2 glass-panel gold-border">
+        <div className="modal-header-premium">
+          <div className="uplink-icon aura-pulse">
+            <Radio size={24} />
+          </div>
+          <h2>UPLINK INITIALIZATION</h2>
+          <button className="close-modal-btn" onClick={onClose} aria-label="Close">×</button>
+        </div>
+
+        <div className="modal-scroll-area">
+          {/* Media Check Preview */}
+          <div className="media-check-zone">
+            <div className="preview-window">
+              <div className="preview-overlay">
+                <span className="preview-badge">PREVIEW</span>
+              </div>
+              <div className="scanline"></div>
+            </div>
+            <div className="media-status-grid">
+              <div className={`status-pill ${mediaStatus.camera === 'granted' ? 'active' : ''}`}>
+                <div className="status-indicator"></div>
+                <span>CAMERA: ACCESS GRANTED</span>
+              </div>
+              <div className={`status-pill ${mediaStatus.mic === 'granted' ? 'active' : ''}`}>
+                <div className="status-indicator"></div>
+                <span>AUDIO: SIGNAL ACTIVE</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="setup-sections">
+            <section className="setup-group">
+              <label>BROADCAST TITLE</label>
+              <input 
+                type="text" 
+                placeholder="e.g. Late Night Chill Stream" 
+                className="chat-input premium-input"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+            </section>
+
+            <section className="setup-group">
+              <label>SIGNAL ARCHITECTURE (STREAM TYPE)</label>
+              <div className="type-selection-grid">
+                {streamTypes.map(type => (
+                  <button 
+                    key={type.id}
+                    className={`type-card ${streamType === type.id ? 'active' : ''}`}
+                    onClick={() => setStreamType(type.id)}
+                    title={`Select ${type.label}`}
+                  >
+                    {type.icon}
+                    <span>{type.label}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="setup-group">
+              <label>FAN-OUT MATRIX</label>
+              <div className="platform-grid">
+                {platforms.map(p => (
+                  <button
+                    key={p}
+                    className={`platform-pill ${selectedPlatforms.includes(p) ? 'active' : ''}`}
+                    onClick={() => {
+                      if (selectedPlatforms.includes(p)) {
+                        setSelectedPlatforms(selectedPlatforms.filter(item => item !== p));
+                      } else {
+                        setSelectedPlatforms([...selectedPlatforms, p]);
+                      }
+                    }}
+                    title={`Stream to ${p}`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <div className="setup-row">
+              <section className="setup-group half">
+                <label>TICKET PRICE ($)</label>
+                <div className="price-input-container">
+                  <DollarSign size={14} />
+                  <input 
+                    type="number" 
+                    className="chat-input price-input" 
+                    value={ticketPrice}
+                    onChange={(e) => setTicketPrice(parseFloat(e.target.value))}
+                    min="0"
+                    placeholder="0.00"
+                    aria-label="Ticket price"
+                    title="Ticket price"
+                  />
+                </div>
+              </section>
+
+              <section className="setup-group half">
+                <label>PRIVACY ACCESS</label>
+                <button 
+                  className={`privacy-toggle ${isPrivate ? 'active' : ''}`}
+                  onClick={() => setIsPrivate(!isPrivate)}
+                  title="Toggle Privacy"
+                >
+                  <Shield size={16} />
+                  <span>{isPrivate ? 'PRIVATE' : 'PUBLIC'}</span>
+                </button>
+              </section>
+            </div>
+          </div>
+        </div>
+
+        <div className="modal-footer-premium">
+          <button className="cancel-uplink-btn" onClick={onClose}>ABORT</button>
+          <button 
+            className="start-uplink-btn-v2 aura-glow"
+            disabled={!title}
+            onClick={() => onStart({ title, category, platforms: selectedPlatforms, type: streamType })}
+          >
+            START UPLINK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+// ============================================
 // MAIN APP COMPONENT
 // ============================================
 
@@ -1203,9 +1600,15 @@ const App: React.FC = () => {
   const [showMarketplace, setShowMarketplace] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [isHost, setIsHost] = useState(false);
+  const [isStreamSetupOpen, setIsStreamSetupOpen] = useState(false);
+  const [streamConfig, setStreamConfig] = useState<{title: string, category: string, platforms: string[]}>({
+    title: '',
+    category: 'Auction',
+    platforms: []
+  });
+  console.log('Current Stream Config:', streamConfig);
   
   const userId = user?.id || 'anonymous';
-  const userDisplayName = user?.username || user?.firstName || 'Guest';
 
   useEffect(() => {
     const newSocket = io(process.env.REACT_APP_API_URL || 'http://localhost:3001', {
@@ -1228,6 +1631,54 @@ const App: React.FC = () => {
     setActivePartyId(null);
     setShowMarketplace(false);
     setIsHost(false);
+  };
+
+  const handleStartHostStream = async (config: { title: string; category: string; platforms: string[] }) => {
+    try {
+      const token = await getToken();
+      
+      // 1. Create Stream Resource
+      const createRes = await fetch('/api/streams', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          hostId: userId,
+          title: config.title,
+          category: config.category,
+          visibility: 'PUBLIC'
+        })
+      });
+
+      if (!createRes.ok) throw new Error("Failed to create stream uplink");
+      const stream = await createRes.json();
+
+      // 2. Activate Uplink & Fan-out
+      const liveRes = await fetch(`/api/streams/${stream.id}/go-live`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          platforms: config.platforms.map(p => p.toLowerCase().replace(' (twitter)', ''))
+        })
+      });
+
+      if (!liveRes.ok) throw new Error("Failed to initialize fan-out matrix");
+
+      setStreamConfig(config);
+      setIsStreamSetupOpen(false);
+      setIsHost(true);
+      setActiveStreamId(stream.id);
+      setActivePartyId(null);
+      setShowMarketplace(false);
+    } catch (err: any) {
+      console.error("[Stream Uplink Error]", err);
+      alert(`SIGNAL ERROR: ${err.message}`);
+    }
   };
 
   const handleJoinParty = (partyId: string) => {
@@ -1331,13 +1782,17 @@ const App: React.FC = () => {
               <h2>Creator Tools</h2>
               <button 
                 className="host-btn"
-                onClick={() => handleJoinStream('host-stream')}
+                onClick={() => setIsStreamSetupOpen(true)}
+                aria-label="Initialize Live Stream"
+                title="Initialize Live Stream"
               >
                 Go Live
               </button>
               <button 
                 className="host-btn start-party-btn"
                 onClick={handleCreateParty}
+                aria-label="Start Watch Party"
+                title="Start Watch Party"
               >
                 Start Watch Party
               </button>
@@ -1357,6 +1812,8 @@ const App: React.FC = () => {
                       const code = (document.getElementById('inviteCodeInput') as HTMLInputElement).value;
                       if (code) handleJoinParty(code);
                     }}
+                    title="Join with access code"
+                    aria-label="Join with access code"
                   >
                     <ArrowRight size={18} />
                   </button>
@@ -1385,6 +1842,12 @@ const App: React.FC = () => {
           />
         )
       ))}
+
+      <StreamSetupModal 
+        isOpen={isStreamSetupOpen}
+        onClose={() => setIsStreamSetupOpen(false)}
+        onStart={handleStartHostStream}
+      />
     </div>
   );
 };

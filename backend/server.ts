@@ -155,7 +155,7 @@ app.get("/api/health", async (req, res) => {
       services: {
         database: "connected",
         mediasoup:
-          mediasoupManager.getWorkers().length > 0 ? "running" : "initializing",
+          mediasoupManager.workers.length > 0 ? "running" : "initializing",
       },
     });
   } catch (err: any) {
@@ -195,8 +195,9 @@ app.post(
             amount: (session.amount_total || 0) / 100,
             currency: session.currency || "usd",
             userId: metadata.buyerId,
-            creatorId: metadata.creatorId,
+            recipientId: metadata.creatorId,
             type: "MARKETPLACE_PURCHASE",
+            paymentMethod: "stripe",
             status: "COMPLETED",
             stripeSessionId: session.id,
           },
@@ -2187,8 +2188,8 @@ io.on("connection", (socket) => {
       });
 
       if (!stream) return;
-
-      let moderation = { action: "allow", confidence: 1.0, reason: "" };
+ 
+      let moderation: any = { action: "allow", confidence: 1.0, reason: "" };
 
       // 2. AI Moderation (Only if Aura is enabled for this creator)
       if (stream.creator.auraEnabled) {
@@ -2227,6 +2228,7 @@ io.on("connection", (socket) => {
           message: message,
           aiAction: moderation.action,
           aiConfidence: moderation.confidence,
+          aiReason: moderation.reason,
           timestamp: data.createdAt,
         });
 
@@ -2248,6 +2250,10 @@ io.on("connection", (socket) => {
             timestamp: new Date(),
             aiAction: "allow",
           });
+
+          if (message.startsWith("!summarize")) {
+            io.to(streamId).emit("stream-summary", aiResponse);
+          }
         }
       }
 
