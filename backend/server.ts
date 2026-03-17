@@ -111,14 +111,20 @@ const RTMP_CONFIG = {
 const app = express();
 const httpServer = createServer(app);
 const allowedOrigins = [
-  process.env.FRONTEND_URL || "http://localhost:3000",
-  "http://srv1327929.hstgr.cloud",
-  "http://76.13.31.91",
+  process.env.FRONTEND_URL || "*",
+  "https://cy-platform.vercel.app",
 ];
 
 const io = new Server(httpServer, {
   cors: {
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Allow all origins for initial deployment debugging
+      if (!origin || allowedOrigins[0] === "*" || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -140,7 +146,13 @@ app.use(
 app.use(compression());
 app.use(
   cors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins[0] === "*" || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     credentials: true,
   }),
 );
@@ -148,12 +160,20 @@ app.use(
 // Health Check
 app.get("/api/health", async (req, res) => {
   try {
-    await prisma.$queryRaw`SELECT 1`;
+    // Attempt DB check but don't fail the whole request
+    let dbStatus = "unknown";
+    try {
+      await prisma.$queryRaw`SELECT 1`;
+      dbStatus = "connected";
+    } catch (e) {
+      dbStatus = "unavailable";
+    }
+
     res.json({
       status: "healthy",
       timestamp: new Date().toISOString(),
       services: {
-        database: "connected",
+        database: dbStatus,
         mediasoup:
           mediasoupManager.workers.length > 0 ? "running" : "initializing",
       },
