@@ -28,6 +28,10 @@ import './App.css';
 import { CreatorDashboard } from './CreatorDashboard';
 import ReactPlayer from 'react-player';
 
+const SafeReactPlayer = ReactPlayer as any;
+const SafeSignedIn = SignedIn as any;
+const SafeSignedOut = SignedOut as any;
+
 // ============================================
 // TYPES
 // ============================================
@@ -1110,7 +1114,7 @@ const StreamView: React.FC<{
                 <h3>Shared Activity: A.I. Music Biz Talk</h3>
              </div>
              <div className="video-wrapper">
-               <ReactPlayer 
+               <SafeReactPlayer 
                   url={sharedMediaUrl} 
                   width="100%" 
                   height="100%" 
@@ -1237,7 +1241,7 @@ const WatchPartyRoom: React.FC<{
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isReady, setIsReady] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string>('https://www.youtube.com/watch?v=dQw4w9WgXcQ'); // Default demo
-  const playerRef = useRef<ReactPlayer>(null);
+  const playerRef = useRef<any>(null);
 
   useEffect(() => {
     if (!socket) return;
@@ -1307,7 +1311,7 @@ const WatchPartyRoom: React.FC<{
     <div className="watch-party-view fade-in">
       <div className="watch-party-main">
         <div className="video-container premium-shadow">
-          <ReactPlayer
+          <SafeReactPlayer
             ref={playerRef}
             url={videoUrl}
             playing={isPlaying}
@@ -1316,14 +1320,15 @@ const WatchPartyRoom: React.FC<{
             height="100%"
             onPlay={() => isHost && syncPlayback(playerRef.current?.getCurrentTime() || 0, true)}
             onPause={() => isHost && syncPlayback(playerRef.current?.getCurrentTime() || 0, false)}
-            onProgress={({ playedSeconds }) => {
+            onProgress={(state: any) => {
+              const { playedSeconds } = state;
               if (isHost && Math.abs(playedSeconds - currentTime) > 1) {
                 syncPlayback(playedSeconds, isPlaying);
               }
             }}
             config={{
               youtube: { playerVars: { origin: window.location.origin } }
-            }}
+            } as any}
           />
           {!isHost && (
              <div className="playback-overlay">
@@ -1715,14 +1720,14 @@ const App: React.FC = () => {
             </div>
             
             <div className="header-nav">
-              <SignedIn>
+              <SafeSignedIn>
                 <button 
                   className="nav-btn dashboard-link"
                   onClick={() => setShowDashboard(true)}
                 >
                   <Layout size={18} /> DASHBOARD
                 </button>
-              </SignedIn>
+              </SafeSignedIn>
               
               <button 
                 className="nav-btn marketplace-link"
@@ -1732,14 +1737,14 @@ const App: React.FC = () => {
               </button>
 
               <div className="auth-zone">
-                <SignedOut>
+                <SafeSignedOut>
                   <SignInButton mode="modal">
                     <button className="auth-btn">JOIN SIGNAL</button>
                   </SignInButton>
-                </SignedOut>
-                <SignedIn>
+                </SafeSignedOut>
+                <SafeSignedIn>
                   <UserButton afterSignOutUrl="/" />
-                </SignedIn>
+                </SafeSignedIn>
               </div>
             </div>
           </header>
