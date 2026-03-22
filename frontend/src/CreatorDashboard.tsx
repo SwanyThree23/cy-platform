@@ -120,7 +120,7 @@ export const CreatorDashboard: React.FC<{
         <button className="back-btn outline-hover" onClick={onBack}>← RETURN</button>
         <div className="header-title">
           <Terminal size={24} className="icon-gold" />
-          <h2 className="gradient-text">CREATOR COMMAND CENTER</h2>
+          <h2 className="gradient-text">SEEWHY LIVE CREATOR STUDIO</h2>
         </div>
         <div className="user-badge">
           <span className="badge-handle">@{profile.handle}</span>
@@ -240,9 +240,14 @@ export const CreatorDashboard: React.FC<{
               <span className="metric-value">412</span>
             </div>
             <div className="metric-box highlight">
-              <span className="metric-label">Total Revenue</span>
+              <span className="metric-label">Creator Revenue (90%)</span>
+              <span className="metric-value">$756.45</span>
+              <span className="metric-trend">10% Platform Fee</span>
+            </div>
+            <div className="metric-box">
+              <span className="metric-label">Gross Revenue</span>
               <span className="metric-value">$840.50</span>
-              <span className="metric-trend positive">0% Platform Fee</span>
+              <span className="metric-trend">PLATFORM_FEE_PCT = 0.10</span>
             </div>
           </div>
         </section>

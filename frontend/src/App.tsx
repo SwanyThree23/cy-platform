@@ -603,8 +603,8 @@ const PaymentButtons: React.FC<{
 
   return (
     <div className="payment-section">
-      <h3 className="payment-title">💰 Support {displayName}</h3>
-      <p className="payment-subtitle">100% goes to creator • 0% platform fee</p>
+      <h3 className="payment-title">Support {displayName}</h3>
+      <p className="payment-subtitle">90% to Creator • 10% Platform Fee</p>
       
       <div className="payment-buttons">
         {paymentMethods.map((method) => {
@@ -1446,12 +1446,19 @@ const StreamSetupModal: React.FC<{
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('Auction');
   const [streamType, setStreamType] = useState('panel');
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['CY Live']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(['SeeWhy Live']);
   const [mediaStatus, setMediaStatus] = useState({ camera: 'granted', mic: 'granted' });
   const [isPrivate, setIsPrivate] = useState(false);
   const [ticketPrice, setTicketPrice] = useState(0);
 
-  const platforms = ['CY Live', 'X (Twitter)', 'YouTube', 'Twitch'];
+  // IMMUTABLE - DO NOT CHANGE
+  const PLATFORM_FEE_PCT = 0.10;
+  
+  // Calculate split preview
+  const creatorAmount = ticketPrice * (1 - PLATFORM_FEE_PCT);
+  const platformAmount = ticketPrice * PLATFORM_FEE_PCT;
+
+  const platforms = ['SeeWhy Live', 'YouTube', 'Twitch', 'TikTok', 'Kick'];
   const streamTypes = [
     { id: 'single', label: 'Single Cam', icon: <Play size={20} /> },
     { id: 'panel', label: 'Panel', icon: <Users size={20} /> },
@@ -1552,13 +1559,26 @@ const StreamSetupModal: React.FC<{
                     type="number" 
                     className="chat-input price-input" 
                     value={ticketPrice}
-                    onChange={(e) => setTicketPrice(parseFloat(e.target.value))}
+                    onChange={(e) => setTicketPrice(parseFloat(e.target.value) || 0)}
                     min="0"
+                    step="0.01"
                     placeholder="0.00"
                     aria-label="Ticket price"
                     title="Ticket price"
                   />
                 </div>
+                {ticketPrice > 0 && (
+                  <div className="split-preview" style={{ marginTop: '8px' }}>
+                    <div className="split-bar">
+                      <div className="creator-portion"></div>
+                      <div className="platform-portion"></div>
+                    </div>
+                    <div className="split-labels">
+                      <span className="creator">You keep: ${creatorAmount.toFixed(2)}</span>
+                      <span className="platform">Platform: ${platformAmount.toFixed(2)}</span>
+                    </div>
+                  </div>
+                )}
               </section>
 
               <section className="setup-group half">
@@ -1711,15 +1731,31 @@ const App: React.FC = () => {
 
   return (
     <div className="app">
+      {/* SeeWhy LIVE Scanline Overlay */}
+      <div className="scanline-overlay" aria-hidden="true"></div>
+      
       {!activeStreamId && !activePartyId ? (
         <div className="home-view">
           <header className="app-header">
-            <div className="header-brand">
-              <h1 className="app-logo">CY LIVE</h1>
-              <p className="app-tagline">SIGNAL OVER NOISE</p>
+            <div className="seewhy-header">
+              <div className="seewhy-logo-mark">SW</div>
+              <div className="seewhy-title">
+                <h1>SEEWHY <span>LIVE</span></h1>
+                <span className="tagline">SWANYTHREE ENTTECH</span>
+              </div>
             </div>
             
             <div className="header-nav">
+              {/* Status Pills */}
+              <div className="status-pill obot">
+                <span className="status-dot"></span>
+                Obot
+              </div>
+              <div className="status-pill k8s">
+                <span className="status-dot"></span>
+                K8s
+              </div>
+              
               <SafeSignedIn>
                 <button 
                   className="nav-btn dashboard-link"
@@ -1749,6 +1785,19 @@ const App: React.FC = () => {
             </div>
           </header>
 
+          {/* SeeWhy LIVE Ticker Bar */}
+          <div className="seewhy-ticker">
+            <div className="ticker-content">
+              <span>SEEWHY LIVE — SwanyThree EntTech</span>
+              <span>90/10 SPLIT — Creator keeps 90%</span>
+              <span>RTMP FANOUT — YouTube · Twitch · TikTok · Kick</span>
+              <span>GUARDIAN AI — Real-time moderation</span>
+              <span>SEEWHY LIVE — SwanyThree EntTech</span>
+              <span>90/10 SPLIT — Creator keeps 90%</span>
+              <span>RTMP FANOUT — YouTube · Twitch · TikTok · Kick</span>
+              <span>GUARDIAN AI — Real-time moderation</span>
+            </div>
+          </div>
 
           <div className="stream-browser">
             <div className="main-sections">

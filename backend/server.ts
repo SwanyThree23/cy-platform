@@ -25,6 +25,49 @@ const PORT = Number(process.env.PORT) || 3001;
 const HOST = process.env.HOST || "0.0.0.0";
 const NODE_ENV = process.env.NODE_ENV || "development";
 
+// ============================================
+// SEEWHY LIVE - IMMUTABLE BUSINESS CONSTANTS
+// DO NOT CHANGE - These values are contractual
+// ============================================
+const PLATFORM_FEE_PCT = 0.10;      // 10% platform fee, creator keeps 90%
+const PREVIEW_SECONDS = 120;         // Free preview before paywall
+const BCRYPT_COST = 12;              // Password hashing rounds
+const JWT_ACCESS_TTL = 900;          // 15 minutes in seconds
+const JWT_REFRESH_TTL = 604800;      // 7 days in seconds
+
+/**
+ * Calculate the 90/10 revenue split for any transaction
+ * All values are in CENTS (integers) to avoid floating point errors
+ * Uses Math.floor() to ensure platform never overcharges
+ * 
+ * @param totalCents - Total transaction amount in cents
+ * @returns Object with platformCents, creatorCents, and fee percentage
+ */
+function calculateRevenueSplit(totalCents: number): {
+  platformCents: number;
+  creatorCents: number;
+  platformFeePct: number;
+  totalCents: number;
+} {
+  // IMMUTABLE: Platform takes 10%, creator keeps 90%
+  const platformCents = Math.floor(totalCents * PLATFORM_FEE_PCT);
+  const creatorCents = totalCents - platformCents;
+  
+  return {
+    platformCents,
+    creatorCents,
+    platformFeePct: PLATFORM_FEE_PCT,
+    totalCents
+  };
+}
+
+/**
+ * Format cents to dollars for display
+ */
+function centsToDollars(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
 // SDK Initializations
 const stripe = new Stripe(
   process.env.STRIPE_SECRET_KEY || "placeholder_stripe_secret_key",
@@ -190,10 +233,14 @@ app.post(
       const metadata = session.metadata;
 
       if (metadata && metadata.videoPostId) {
-        // Record purchase in DB
+        // Calculate 90/10 revenue split (all values in cents)
+        const totalCents = session.amount_total || 0;
+        const split = calculateRevenueSplit(totalCents);
+        
+        // Record purchase in DB with split details
         await prisma.payment.create({
           data: {
-            amount: (session.amount_total || 0) / 100,
+            amount: split.totalCents / 100, // Store in dollars for legacy compatibility
             currency: session.currency || "usd",
             userId: metadata.buyerId,
             recipientId: metadata.creatorId,
@@ -201,11 +248,16 @@ app.post(
             paymentMethod: "stripe",
             status: "COMPLETED",
             stripeSessionId: session.id,
+            // 90/10 Split - PLATFORM_FEE_PCT = 0.10
+            platformFee: split.platformCents / 100, // Platform gets 10%
           },
         });
 
         console.log(
-          `[Stripe] Purchase confirmed for post ${metadata.videoPostId}`,
+          `[SeeWhy LIVE] Purchase confirmed for post ${metadata.videoPostId}`,
+          `| Total: $${centsToDollars(split.totalCents)}`,
+          `| Creator: $${centsToDollars(split.creatorCents)} (90%)`,
+          `| Platform: $${centsToDollars(split.platformCents)} (10%)`
         );
       }
     }

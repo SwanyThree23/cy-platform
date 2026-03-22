@@ -124,6 +124,14 @@ model Stream {
   totalViewers        Int          @default(0) @map("total_viewers")
   totalMessages       Int          @default(0) @map("total_messages")
   totalSuperChat      Float        @default(0.0) @map("total_super_chat")
+  
+  // SeeWhy LIVE Golden Paywall - PREVIEW_SECONDS = 120 (IMMUTABLE)
+  paywallPriceCents   Int?         @map("paywall_price_cents")  // Paywall price in cents
+  previewSeconds      Int          @default(120) @map("preview_seconds")  // Free preview duration
+  
+  // Revenue Tracking (90/10 Split)
+  creatorRevenueCents Int          @default(0) @map("creator_revenue_cents")  // Total creator earnings
+  platformFeeCents    Int          @default(0) @map("platform_fee_cents")     // Total platform fees
 
   createdAt           DateTime     @default(now()) @map("created_at")
   updatedAt           DateTime     @updatedAt @map("updated_at")
@@ -276,9 +284,14 @@ model Payment {
   
   amount              Float
   currency            String    @default("USD")
-  paymentMethod       String    // paypal, cashapp, venmo, zelle, chime
+  paymentMethod       String    // paypal, cashapp, venmo, zelle, chime, stripe
   
-  platformFee         Float     @default(0.0)
+  // SeeWhy LIVE 90/10 Split - PLATFORM_FEE_PCT = 0.10 (IMMUTABLE)
+  platformFee         Float     @default(0.0)   // Platform's 10% share (in dollars)
+  platformFeePct      Float     @default(0.10)  // Fee percentage (always 0.10)
+  platformCents       Int       @default(0)     // Platform share in cents
+  creatorCents        Int       @default(0)     // Creator share in cents (90%)
+  
   status              String    @default("pending")
   externalTransactionId String?
   
@@ -286,7 +299,7 @@ model Payment {
   isAnonymous         Boolean   @default(false)
   
   // Platform Type & Tracking
-  type                String?   @default("DONATION") // DONATION, SUBSCRIPTION, MARKETPLACE_PURCHASE
+  type                String?   @default("DONATION") // DONATION, SUBSCRIPTION, MARKETPLACE_PURCHASE, PAYWALL, TIP
   stripeSessionId     String?   @unique
   userId              String?   // Buyer/Sender ID
   
