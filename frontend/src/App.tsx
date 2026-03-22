@@ -1,14 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, createContext, useContext } from 'react';
 import { Device } from 'mediasoup-client';
 import { io, Socket } from 'socket.io-client';
-import { 
-  useUser, 
-  useAuth, 
-  UserButton, 
-  SignInButton, 
-  SignedIn, 
-  SignedOut 
-} from '@clerk/clerk-react';
 import { 
   ShoppingBag,
   Users,
@@ -28,9 +20,63 @@ import './App.css';
 import { CreatorDashboard } from './CreatorDashboard';
 import ReactPlayer from 'react-player';
 
+// SeeWhy LIVE - Safe Clerk imports with fallbacks for preview mode
+let useUser: any, useAuth: any, UserButton: any, SignInButton: any, SignedIn: any, SignedOut: any;
+
+try {
+  const clerk = require('@clerk/clerk-react');
+  useUser = clerk.useUser;
+  useAuth = clerk.useAuth;
+  UserButton = clerk.UserButton;
+  SignInButton = clerk.SignInButton;
+  SignedIn = clerk.SignedIn;
+  SignedOut = clerk.SignedOut;
+} catch (e) {
+  // Fallback stubs for preview mode
+  useUser = () => ({ user: null, isLoaded: true });
+  useAuth = () => ({ isSignedIn: false, userId: null });
+  UserButton = () => null;
+  SignInButton = ({ children }: any) => children;
+  SignedIn = ({ children }: any) => null;
+  SignedOut = ({ children }: any) => children;
+}
+
+// Preview mode context for demo user
+const PreviewModeContext = createContext({ 
+  isPreview: true, 
+  demoUser: { 
+    id: 'demo-user-1', 
+    username: 'SeeWhyDemo', 
+    displayName: 'SeeWhy Demo User',
+    avatarUrl: null 
+  } 
+});
+
 const SafeReactPlayer = ReactPlayer as any;
-const SafeSignedIn = SignedIn as any;
-const SafeSignedOut = SignedOut as any;
+
+// Safe wrapper components that work with or without Clerk
+const SafeSignedIn: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  try {
+    const { isSignedIn } = useAuth();
+    if (isSignedIn) return <>{children}</>;
+    // In preview mode, show dashboard anyway
+    const hasClerkKey = !!process.env.REACT_APP_CLERK_PUBLISHABLE_KEY;
+    if (!hasClerkKey) return <>{children}</>;
+    return null;
+  } catch {
+    return <>{children}</>;
+  }
+};
+
+const SafeSignedOut: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  try {
+    const { isSignedIn } = useAuth();
+    if (!isSignedIn) return <>{children}</>;
+    return null;
+  } catch {
+    return null;
+  }
+};
 
 // ============================================
 // TYPES
@@ -1636,19 +1682,32 @@ const App: React.FC = () => {
   const userId = user?.id || 'anonymous';
 
   useEffect(() => {
-    const newSocket = io(process.env.REACT_APP_API_URL || 'http://localhost:3001', {
-      transports: ['websocket', 'polling'],
-    });
+    // SeeWhy LIVE - Socket connection with graceful fallback for preview
+    const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
+    
+    try {
+      const newSocket = io(apiUrl, {
+        transports: ['websocket', 'polling'],
+        timeout: 5000,
+        reconnectionAttempts: 3,
+      });
 
-    newSocket.on('connect', () => {
-      console.log('[Socket] Connected:', newSocket.id);
-    });
+      newSocket.on('connect', () => {
+        console.log('[SeeWhy LIVE] Socket connected:', newSocket.id);
+      });
+      
+      newSocket.on('connect_error', (err) => {
+        console.log('[SeeWhy LIVE] Socket connection failed - running in preview mode');
+      });
 
-    setSocket(newSocket);
+      setSocket(newSocket);
 
-    return () => {
-      newSocket.close();
-    };
+      return () => {
+        newSocket.close();
+      };
+    } catch (err) {
+      console.log('[SeeWhy LIVE] Socket unavailable - preview mode active');
+    }
   }, []);
 
   const handleJoinStream = (streamId: string) => {
