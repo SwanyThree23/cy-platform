@@ -122,10 +122,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:3001}
+        REACT_APP_API_URL: ${REACT_APP_API_URL}
+        REACT_APP_CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY}
     container_name: cy-frontend
     environment:
-      REACT_APP_API_URL: ${REACT_APP_API_URL:-http://localhost:3001}
+      REACT_APP_API_URL: ${REACT_APP_API_URL}
+      REACT_APP_CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY}
 
     ports:
       - "3000:3000"
