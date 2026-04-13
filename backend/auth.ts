@@ -3,7 +3,7 @@ import { ClerkExpressWithAuth } from '@clerk/clerk-sdk-node';
 
 // Setup Clerk middleware
 // Note: CLERK_SECRET_KEY must be in environment
-export const authMiddleware = ClerkExpressWithAuth({
+export const authMiddleware: any = ClerkExpressWithAuth({
   // No options needed for basic session validation
 });
 
