@@ -64,7 +64,7 @@ export const CreatorDashboard: React.FC<{
   };
 
   const generateKeys = async () => {
-    if (!confirm("Are you sure? This will invalidate your current stream keys.")) return;
+    if (!window.confirm("Are you sure? This will invalidate your current stream keys.")) return;
     setIsUpdating(true);
     try {
       const token = await getToken();
