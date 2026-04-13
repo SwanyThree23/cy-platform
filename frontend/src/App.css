@@ -995,12 +995,13 @@ h2 {
 .start-uplink-btn {
   padding: 12px 24px;
 }
-
-.platform-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+.platform-grid-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
+
+.big-stat .stat-label {
   font-size: 0.7rem;
   color: var(--signal-low);
 }
