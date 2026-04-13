@@ -711,7 +711,7 @@ const ChatPanel: React.FC<{
                 {msg.userId === hostId && <Shield size={10} className="icon-gold" style={{marginLeft: '4px'}} />}
               </span>
               {msg.aiAction === 'flag' && <Shield size={10} className="icon-red" />}
-              {msg.aiConfidence && msg.aiConfidence > 0.8 && <Zap size={8} className="icon-gold" title={`Aura Confidence: ${Math.round(msg.aiConfidence * 100)}%`} />}
+              {msg.aiConfidence && msg.aiConfidence > 0.8 && <span title={`Aura Confidence: ${Math.round(msg.aiConfidence * 100)}%`}><Zap size={8} className="icon-gold" /></span>}
             </div>
             <span className="chat-text">
               {msg.aiAction === 'flag' ? `[FLAGGED] ${msg.message}` : msg.message}
