@@ -112,13 +112,13 @@ const app = express();
 const httpServer = createServer(app);
 const allowedOrigins = [
   process.env.FRONTEND_URL || "http://localhost:3000",
+  "http://2.24.194.112",
   "http://srv1327929.hstgr.cloud",
   "http://76.13.31.91",
 ];
 
 const io = new Server(httpServer, {
   cors: {
-    
     origin: allowedOrigins,
     methods: ["GET", "POST"],
     credentials: true,
