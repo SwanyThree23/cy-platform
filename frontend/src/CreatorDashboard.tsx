@@ -141,8 +141,8 @@ export const CreatorDashboard: React.FC<{
             <div className="form-group">
               <label>RTMP Server URL</label>
               <div className="copy-input-wrapper">
-                <input type="text" readOnly value="rtmp://stream.swanythree.live:1935/live" className="mono-input" aria-label="RTMP Server URL" />
-                <button className="icon-btn" onClick={() => handleCopy("rtmp://stream.swanythree.live:1935/live", 'key')} aria-label="Copy RTMP URL">
+                <input type="text" readOnly value="rtmp://2.24.198.112:1935/live" className="mono-input" aria-label="RTMP Server URL" />
+                <button className="icon-btn" onClick={() => handleCopy("rtmp://2.24.198.112:1935/live", 'key')} aria-label="Copy RTMP URL">
                   <Copy size={16} />
                 </button>
               </div>
