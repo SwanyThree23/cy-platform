@@ -1,0 +1,43 @@
+{
+  "name": "seewhy-live",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "next": "14.2.29",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@supabase/supabase-js": "^2.49.4",
+    "@supabase/ssr": "^0.5.2",
+    "stripe": "^17.7.0",
+    "@stripe/stripe-js": "^5.5.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
+    "livekit-server-sdk": "^2.9.5",
+    "@livekit/components-react": "^2.9.3",
+    "@livekit/components-styles": "^1.1.1",
+    "livekit-client": "^2.9.5",
+    "zustand": "^5.0.3",
+    "framer-motion": "^12.6.5",
+    "recharts": "^2.15.3",
+    "lucide-react": "^0.503.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "@types/react": "^18.3.20",
+    "@types/react-dom": "^18.3.5",
+    "typescript": "^5.8.3",
+    "tailwindcss": "^3.4.17",
+    "postcss": "^8.5.3",
+    "autoprefixer": "^10.4.21",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.29"
+  }
+}
