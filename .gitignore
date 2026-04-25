@@ -1,3 +1,6 @@
-node_modules
-node_modules
-  m n/
+node_modules/
+backend/dist/
+frontend/build/
+.env
+.env.local
+.DS_Store
