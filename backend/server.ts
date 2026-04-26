@@ -112,8 +112,10 @@ const app = express();
 const httpServer = createServer(app);
 const allowedOrigins = [
   process.env.FRONTEND_URL || "http://localhost:3000",
-  "http://2.24.194.112",
-  "http://srv1327929.hstgr.cloud",
+  "http://2.24.198.112",
+  "https://2.24.198.112",
+  "http://srv1587098.hstgr.cloud",
+  "https://srv1587098.hstgr.cloud",
   "http://76.13.31.91",
 ];
 
