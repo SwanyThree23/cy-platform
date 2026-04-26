@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
   switch (event.type) {
     case 'checkout.session.completed': {
-      const session = event.data.object as Stripe.CheckoutSession
+      const session = event.data.object as Stripe.Checkout.Session
       const uid  = session.metadata?.supabase_uid
       const plan = session.metadata?.plan
       if (uid && plan) {
@@ -43,4 +43,5 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ received: true })
 }
 
-export const config = { api: { bodyParser: false } }
+// App Router reads body as a stream — no bodyParser config needed
+export const dynamic = 'force-dynamic'
