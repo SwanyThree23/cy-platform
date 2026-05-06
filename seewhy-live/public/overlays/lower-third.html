@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lower Third Overlay</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: transparent;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  }
+
+  #lower-third {
+    position: absolute;
+    bottom: 80px;
+    left: 0;
+    display: flex;
+    align-items: stretch;
+    transform: translateX(-110%);
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+    max-width: 700px;
+  }
+
+  #lower-third.show {
+    transform: translateX(0);
+  }
+
+  .bar {
+    width: 6px;
+    background: #D4AF37;
+    border-radius: 0 0 0 0;
+  }
+
+  .content {
+    background: rgba(12, 8, 6, 0.92);
+    border-top: 2px solid #D4AF37;
+    padding: 16px 28px 16px 18px;
+    backdrop-filter: blur(12px);
+  }
+
+  .name {
+    font-size: 38px;
+    font-weight: 800;
+    color: #F5F5DC;
+    letter-spacing: 1px;
+    line-height: 1;
+    text-transform: uppercase;
+  }
+
+  .title {
+    font-size: 22px;
+    color: #D4AF37;
+    margin-top: 4px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+<div id="lower-third">
+  <div class="bar"></div>
+  <div class="content">
+    <div class="name" id="name">Joyce</div>
+    <div class="title" id="title">Host · Domino Entertainment</div>
+  </div>
+</div>
+
+<script>
+  const el    = document.getElementById('lower-third');
+  const nameEl  = document.getElementById('name');
+  const titleEl = document.getElementById('title');
+
+  // URL param test mode
+  const params = new URLSearchParams(location.search);
+  const testName  = params.get('name');
+  const testTitle = params.get('title');
+  const streamId  = params.get('streamId');
+  const duration  = parseInt(params.get('duration') ?? '-1', 10);
+
+  if (testName)  nameEl.textContent  = testName;
+  if (testTitle) titleEl.textContent = testTitle;
+
+  if (params.get('test') === '1') {
+    el.classList.add('show');
+    if (duration > 0) setTimeout(() => el.classList.remove('show'), duration * 1000);
+    if (duration === 0) { /* stay forever */ }
+  }
+
+  // SSE connection
+  if (streamId) {
+    const sse = new EventSource(`/api/overlays/events?streamId=${streamId}`);
+
+    sse.addEventListener('lower-third', e => {
+      const data = JSON.parse(e.data);
+      nameEl.textContent  = data.name  || nameEl.textContent;
+      titleEl.textContent = data.title || titleEl.textContent;
+      el.classList.add('show');
+      if (data.duration > 0) {
+        setTimeout(() => el.classList.remove('show'), data.duration * 1000);
+      }
+    });
+
+    sse.addEventListener('lower-third-hide', () => {
+      el.classList.remove('show');
+    });
+  }
+</script>
+</body>
+</html>

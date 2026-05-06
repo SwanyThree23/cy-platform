@@ -1,0 +1,119 @@
+{
+  "name": "SeeWhy LIVE — Social Distribution (All Platforms)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "social-distribution",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.secret }}",
+              "value2": "={{ $env.N8N_INTERNAL_SECRET }}"
+            }
+          ]
+        }
+      },
+      "id": "validate-secret",
+      "name": "Validate Secret",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const d = $json;\nconst watchUrl = d.watch_url || `https://seewhylive.online/watch/${d.stream_id}`;\nconst statusTag = d.is_live ? '🔴 LIVE NOW' : '🎬 Starting Soon';\n\nconst posts = d.posts || [];\n\nconst digest = posts.map(p => [\n  `━━━ ${p.platform.toUpperCase().replace(/_/g,' ')} ━━━`,\n  p.postText,\n  `Hashtags: ${p.hashtags.map(h => '#'+h).join(' ')}`,\n  p.manualSteps ? `→ ${p.manualSteps}` : '',\n  p.profileUrl ? `Profile: ${p.profileUrl}` : '',\n].filter(Boolean).join('\\n')).join('\\n\\n');\n\nconst emailBody = [\n  `${statusTag} — ${d.title}`,\n  `Creator: ${d.creator} (@${d.handle})`,\n  `Watch URL: ${watchUrl}`,\n  '',\n  '=== PLATFORM POSTS ===',\n  '',\n  digest,\n  '',\n  '— SeeWhy LIVE Automation',\n].join('\\n');\n\nreturn [{ json: { ...d, emailBody, watchUrl } }];"
+      },
+      "id": "build-digest",
+      "name": "Build Platform Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 320]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.CREATOR_NOTIFY_EMAIL }}",
+        "toEmail":   "={{ $env.CREATOR_NOTIFY_EMAIL }}",
+        "subject":   "🔴 You're LIVE — Social Posts for All 7 Platforms",
+        "emailType": "text",
+        "message":   "={{ $json.emailBody }}"
+      },
+      "id": "send-digest-email",
+      "name": "Send Platform Digest Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [900, 320]
+    },
+    {
+      "parameters": {
+        "url":       "https://public-api.lu.ma/v1/event/edit",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "x-luma-api-key", "value": "={{ $env.LUMA_API_KEY }}" },
+            { "name": "Content-Type",   "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "api_id",      "value": "={{ $json.lumaEventId }}" },
+            { "name": "meeting_url", "value": "={{ $json.watchUrl }}" },
+            { "name": "description", "value": "🔴 LIVE NOW — Watch at {{ $json.watchUrl }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "luma-update",
+      "name": "Luma: Update Event",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [900, 480],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"ok\": true, \"platforms\": 7 }"
+      },
+      "id": "respond-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Unauthorized\" }",
+        "options": { "responseCode": 401 }
+      },
+      "id": "respond-unauth",
+      "name": "Respond Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [680, 500]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger":       { "main": [[{ "node": "Validate Secret",         "type": "main", "index": 0 }]] },
+    "Validate Secret":       { "main": [[{ "node": "Build Platform Digest",   "type": "main", "index": 0 }], [{ "node": "Respond Unauthorized", "type": "main", "index": 0 }]] },
+    "Build Platform Digest": { "main": [[{ "node": "Send Platform Digest Email", "type": "main", "index": 0 }, { "node": "Luma: Update Event", "type": "main", "index": 0 }]] },
+    "Send Platform Digest Email": { "main": [[{ "node": "Respond OK", "type": "main", "index": 0 }]] },
+    "Luma: Update Event":    { "main": [[{ "node": "Respond OK", "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": ["seewhy-live", "social", "luma", "distribution"]
+}

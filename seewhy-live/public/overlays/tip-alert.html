@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tip Alert Overlay</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: transparent;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  }
+
+  #tip-alert {
+    position: absolute;
+    top: 40px;
+    right: 40px;
+    background: rgba(12, 8, 6, 0.95);
+    border: 2px solid #D4AF37;
+    border-radius: 16px;
+    padding: 20px 28px;
+    min-width: 360px;
+    max-width: 500px;
+    opacity: 0;
+    transform: translateY(-30px) scale(0.95);
+    transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    backdrop-filter: blur(16px);
+  }
+
+  #tip-alert.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  .tip-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .tip-icon {
+    font-size: 28px;
+  }
+
+  .tip-label {
+    font-size: 14px;
+    color: #D4AF37;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .tip-amount {
+    font-size: 52px;
+    font-weight: 900;
+    color: #D4AF37;
+    line-height: 1;
+    letter-spacing: -1px;
+  }
+
+  .tip-from {
+    font-size: 20px;
+    color: #F5F5DC;
+    margin-top: 6px;
+    font-weight: 600;
+  }
+
+  .tip-message {
+    font-size: 17px;
+    color: rgba(245,245,220,0.7);
+    margin-top: 6px;
+    font-style: italic;
+    font-family: 'Lora', Georgia, serif;
+    line-height: 1.4;
+  }
+
+  /* Gold shimmer animation */
+  @keyframes shimmer {
+    0%   { box-shadow: 0 0 20px rgba(212,175,55,0.4); }
+    50%  { box-shadow: 0 0 40px rgba(212,175,55,0.8), 0 0 60px rgba(212,175,55,0.3); }
+    100% { box-shadow: 0 0 20px rgba(212,175,55,0.4); }
+  }
+
+  #tip-alert.show {
+    animation: shimmer 1.5s ease-in-out 1;
+  }
+</style>
+</head>
+<body>
+<div id="tip-alert">
+  <div class="tip-header">
+    <span class="tip-icon">💰</span>
+    <span class="tip-label">Tip Received</span>
+  </div>
+  <div class="tip-amount" id="amount">$5.00</div>
+  <div class="tip-from" id="from">from Anonymous</div>
+  <div class="tip-message" id="message"></div>
+</div>
+
+<script>
+  const el        = document.getElementById('tip-alert');
+  const amountEl  = document.getElementById('amount');
+  const fromEl    = document.getElementById('from');
+  const messageEl = document.getElementById('message');
+
+  const params   = new URLSearchParams(location.search);
+  const streamId = params.get('streamId');
+
+  function showTip(amountCents, tipper, msg) {
+    const dollars = (amountCents / 100).toFixed(2);
+    amountEl.textContent  = `$${dollars}`;
+    fromEl.textContent    = `from ${tipper || 'Anonymous'}`;
+    messageEl.textContent = msg || '';
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 6000);
+  }
+
+  // URL param test mode
+  if (params.get('test') === '1') {
+    const amount  = parseInt(params.get('amount') || '1500', 10);
+    const tipper  = params.get('tipper') || 'SwanyT';
+    const msg     = params.get('msg')    || '';
+    setTimeout(() => showTip(amount, tipper, msg), 500);
+  }
+
+  // SSE connection
+  if (streamId) {
+    const sse = new EventSource(`/api/overlays/events?streamId=${streamId}`);
+
+    sse.addEventListener('tip', e => {
+      const data = JSON.parse(e.data);
+      showTip(data.amount || 0, data.tipper, data.message);
+    });
+  }
+</script>
+</body>
+</html>
