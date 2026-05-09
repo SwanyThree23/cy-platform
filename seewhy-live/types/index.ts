@@ -14,6 +14,8 @@ export interface Profile {
   paypal_handle: string | null
   cashapp_handle: string | null
   venmo_handle: string | null
+  zelle_handle: string | null
+  chime_handle: string | null
   created_at: string
 }
 

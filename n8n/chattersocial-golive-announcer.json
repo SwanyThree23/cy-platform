@@ -1,0 +1,91 @@
+{
+  "name": "ChatterSocial Go-Live Announcer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "chattersocial-golive",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.secret }}",
+              "value2": "={{ $env.N8N_INTERNAL_SECRET }}"
+            }
+          ]
+        }
+      },
+      "id": "validate-secret",
+      "name": "Validate Secret",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $json;\nconst statusTag = data.isLive ? '🔴 LIVE NOW' : '🎬 Starting Soon';\nconst viewerLine = data.isLive && data.viewerCount > 0 ? `\\n👥 ${data.viewerCount} watching` : '';\nconst watchUrl = data.watchUrl || `https://seewhylive.online/watch/${data.streamId}`;\n\nconst announcement = `${statusTag} — ${data.title}\\n\\n🎙️ Hosted by ${data.creatorName} (@${data.handle})${viewerLine}\\n\\n▶️ Watch: ${watchUrl}\\n\\n#SeeWhyLive #DominoEntertainment`;\n\nreturn [{ json: { ...data, announcement } }];"
+      },
+      "id": "format-post",
+      "name": "Format ChatterSocial Post",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 220]
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $env.CREATOR_NOTIFY_EMAIL }}",
+        "toEmail":   "={{ $env.CREATOR_NOTIFY_EMAIL }}",
+        "subject":   "🔴 You're LIVE — ChatterSocial Post Ready",
+        "emailType": "text",
+        "message":   "Your stream is LIVE!\n\nCopy & paste this into ChatterSocial:\n\n{{ $json.announcement }}\n\nWatch URL: {{ $json.watchUrl }}\n\n— SeeWhy LIVE"
+      },
+      "id": "send-email",
+      "name": "Send Clipboard Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [900, 220]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"ok\": true }"
+      },
+      "id": "respond-ok",
+      "name": "Respond OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1120, 220]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "{ \"error\": \"Unauthorized\" }",
+        "options": { "responseCode": 401 }
+      },
+      "id": "respond-unauth",
+      "name": "Respond Unauthorized",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [680, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Trigger":        { "main": [[{ "node": "Validate Secret",       "type": "main", "index": 0 }]] },
+    "Validate Secret":        { "main": [[{ "node": "Format ChatterSocial Post", "type": "main", "index": 0 }], [{ "node": "Respond Unauthorized", "type": "main", "index": 0 }]] },
+    "Format ChatterSocial Post": { "main": [[{ "node": "Send Clipboard Email", "type": "main", "index": 0 }]] },
+    "Send Clipboard Email":   { "main": [[{ "node": "Respond OK",           "type": "main", "index": 0 }]] }
+  },
+  "active": false,
+  "settings": { "executionOrder": "v1" },
+  "tags": ["seewhy-live", "social", "chattersocial"]
+}

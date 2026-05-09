@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stream Banner Overlay</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: transparent;
+    width: 1920px;
+    height: 1080px;
+    overflow: hidden;
+    font-family: 'Bebas Neue', 'Impact', sans-serif;
+  }
+
+  #banner {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    background: rgba(12, 8, 6, 0.88);
+    border-bottom: 3px solid #D4AF37;
+    padding: 18px 48px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(8px);
+    transform: translateY(-100%);
+    transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  #banner.show {
+    transform: translateY(0);
+  }
+
+  .banner-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .live-badge {
+    background: #800020;
+    color: white;
+    font-size: 20px;
+    letter-spacing: 3px;
+    padding: 4px 14px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .live-dot {
+    width: 10px;
+    height: 10px;
+    background: white;
+    border-radius: 50%;
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .stream-title {
+    font-size: 42px;
+    color: #F5F5DC;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .banner-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+
+  .brand {
+    font-size: 28px;
+    color: #D4AF37;
+    letter-spacing: 3px;
+  }
+
+  .url {
+    font-size: 18px;
+    color: rgba(245,245,220,0.5);
+    font-family: 'DM Mono', 'Courier New', monospace;
+    letter-spacing: 1px;
+  }
+
+  #viewer-count {
+    font-size: 22px;
+    color: rgba(245,245,220,0.7);
+    font-family: 'Barlow Condensed', sans-serif;
+    font-weight: 500;
+  }
+</style>
+</head>
+<body>
+<div id="banner">
+  <div class="banner-left">
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      LIVE
+    </div>
+    <div class="stream-title" id="title">Washington Classic Domino Tournament</div>
+  </div>
+  <div class="banner-right">
+    <div class="brand">DOMINO ENTERTAINMENT</div>
+    <div class="url">seewhylive.online</div>
+    <div id="viewer-count"></div>
+  </div>
+</div>
+
+<script>
+  const banner      = document.getElementById('banner');
+  const titleEl     = document.getElementById('title');
+  const viewerEl    = document.getElementById('viewer-count');
+
+  const params   = new URLSearchParams(location.search);
+  const streamId = params.get('streamId');
+  const testTitle = params.get('title');
+
+  if (testTitle) titleEl.textContent = testTitle;
+
+  // Auto-show banner
+  setTimeout(() => banner.classList.add('show'), 300);
+
+  // SSE connection
+  if (streamId) {
+    const sse = new EventSource(`/api/overlays/events?streamId=${streamId}`);
+
+    sse.addEventListener('stream-live', e => {
+      const data = JSON.parse(e.data);
+      if (data.title) titleEl.textContent = data.title;
+      banner.classList.add('show');
+    });
+
+    sse.addEventListener('viewer-update', e => {
+      const data = JSON.parse(e.data);
+      const count = data.count || 0;
+      viewerEl.textContent = count > 0
+        ? `👁 ${count >= 1000 ? (count/1000).toFixed(1)+'k' : count} watching`
+        : '';
+    });
+
+    sse.addEventListener('stream-ended', () => {
+      banner.classList.remove('show');
+    });
+  }
+</script>
+</body>
+</html>

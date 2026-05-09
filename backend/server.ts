@@ -10,6 +10,7 @@ import ffmpeg from "fluent-ffmpeg";
 import { EventEmitter } from "events";
 import * as crypto from "node:crypto";
 import dotenv from "dotenv";
+import path from "path";
 import prisma from "./prisma";
 import { authMiddleware, requireAuth } from "./auth";
 import Stripe from "stripe";
@@ -209,6 +210,18 @@ app.post(
         console.log(
           `[Stripe] Purchase confirmed for post ${metadata.videoPostId}`,
         );
+      }
+
+      // Fire overlay tip alert for live stream tips (non-blocking)
+      if (metadata && metadata.streamId && metadata.type === "tip") {
+        try {
+          const { publishOverlayEvent } = await import("./routes/overlays");
+          publishOverlayEvent(metadata.streamId, "tip", {
+            amount:  session.amount_total || 0,
+            tipper:  metadata.tipper_name || "Anonymous",
+            message: metadata.tip_message || "",
+          });
+        } catch { /* overlay not critical */ }
       }
     }
 
@@ -1219,6 +1232,11 @@ class StreamManager extends EventEmitter {
     });
 
     this.emit("streamStarted", { streamId, hostId: stream.creatorId });
+
+    // Fire social integration side effects (non-blocking)
+    import("./routes/stream-status")
+      .then(({ triggerGoLiveSideEffects }) => triggerGoLiveSideEffects(streamId))
+      .catch(console.error);
 
     return stream;
   }
@@ -2439,11 +2457,43 @@ io.on("connection", (socket) => {
 });
 
 // ============================================
+// SOCIAL INTEGRATION LAYER
+// ============================================
+
+// Async import workaround for TypeScript CommonJS interop
+async function registerSocialRoutes() {
+  try {
+    const { default: shareChatterSocialRouter } = await import("./routes/share-chattersocial");
+    const { default: overlayRouter }            = await import("./routes/overlays");
+    const { default: socialDistributionRouter } = await import("./routes/social-distribution");
+    const { default: streamStatusRouter }       = await import("./routes/stream-status");
+
+    app.use("/api/share/chattersocial", shareChatterSocialRouter);
+    app.use("/api/overlays",            overlayRouter);
+    app.use("/api/social/distribution", socialDistributionRouter);
+
+    // Only add stream-status route if PATCH /api/streams/:id/status is not yet registered
+    app.use("/api/streams",             streamStatusRouter);
+
+    // Serve overlay HTML files for evmux websources
+    const overlaysPath = path.join(__dirname, "../public/overlays");
+    app.use("/overlays", express.static(overlaysPath));
+
+    console.log("[Social] Integration layer routes registered");
+  } catch (err) {
+    console.error("[Social] Failed to register integration routes:", err);
+  }
+}
+
+// ============================================
 // STARTUP
 // ============================================
 
 async function startServer() {
   try {
+    // Register social integration routes
+    await registerSocialRoutes();
+
     // Initialize Mediasoup
     await mediasoupManager.initialize(2);
 
